@@ -1,4 +1,4 @@
-# HappyLab Home · Motion Intelligence Lab
+# Happy-Lab Home · Motion Intelligence Lab
 
 一个面向实验室的全栈主页与内容管理系统。项目同时提供公开实验室网站、内部内容工作台、反馈收集页、FastAPI 数据接口和两个可独立替换的 Demo 容器。
 
