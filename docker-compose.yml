@@ -1,0 +1,77 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: lab-web
+    environment:
+      API_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: ""
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+    container_name: lab-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://lab:lab@db:5432/labdb
+      JWT_SECRET: ${JWT_SECRET:-replace-me-in-production}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@motionlab.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-now}
+      MEDIA_ROOT: /data/uploads
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8080
+    volumes:
+      - lab_uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: lab-db
+    environment:
+      POSTGRES_DB: labdb
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: lab
+    volumes:
+      - lab_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lab -d labdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: lab-caddy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+    restart: unless-stopped
+
+  demo-a:
+    build: ./demos/demo-a
+    container_name: lab-demo-a
+    profiles: ["demos"]
+
+  demo-b:
+    build: ./demos/demo-b
+    container_name: lab-demo-b
+    profiles: ["demos"]
+
+volumes:
+  lab_postgres:
+  lab_uploads:
+  caddy_data:
+  caddy_config:

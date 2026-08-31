@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Anime avatar</title>
+  <desc id="desc">A friendly anime-style researcher with glasses</desc>
+  <rect width="512" height="512" rx="92" fill="#edf2f7"/>
+  <circle cx="256" cy="248" r="188" fill="#dbe8f1"/>
+  <path d="M92 512c9-79 61-129 164-129s155 50 164 129Z" fill="#24395b"/>
+  <path d="m160 424 96 52 96-52-24-69H184Z" fill="#f1b14c"/>
+  <path d="m184 367 72 47 72-47-12-58H196Z" fill="#f6c7a4"/>
+  <path d="M137 221c-4-75 41-147 119-147 82 0 126 61 119 153-5 69-35 155-119 155-81 0-115-86-119-161Z" fill="#f6c7a4"/>
+  <circle cx="137" cy="247" r="25" fill="#f0b58f"/>
+  <circle cx="375" cy="247" r="25" fill="#f0b58f"/>
+  <path d="M132 225c-17-77 32-154 123-154 73 0 132 54 123 147-37-10-68-34-91-70-39 48-91 69-155 77Z" fill="#283347"/>
+  <path d="M139 184c17-64 61-99 119-99 51 0 92 26 112 73-34 3-62-9-87-38-31 42-77 64-144 64Z" fill="#33415b"/>
+  <path d="M167 147c31-35 61-53 95-53 40 0 72 17 97 50-37-10-67-27-90-50-27 31-61 49-102 53Z" fill="#44536d"/>
+  <path d="M185 276c18 12 39 18 63 18s45-6 63-18" fill="none" stroke="#a65f62" stroke-linecap="round" stroke-width="7"/>
+  <ellipse cx="205" cy="236" rx="31" ry="25" fill="#fff"/>
+  <ellipse cx="307" cy="236" rx="31" ry="25" fill="#fff"/>
+  <circle cx="211" cy="238" r="13" fill="#4a75a8"/>
+  <circle cx="301" cy="238" r="13" fill="#4a75a8"/>
+  <circle cx="215" cy="233" r="4" fill="#fff"/>
+  <circle cx="305" cy="233" r="4" fill="#fff"/>
+  <rect x="169" y="207" width="70" height="57" rx="19" fill="none" stroke="#27364d" stroke-width="8"/>
+  <rect x="273" y="207" width="70" height="57" rx="19" fill="none" stroke="#27364d" stroke-width="8"/>
+  <path d="M239 226h34" fill="none" stroke="#27364d" stroke-width="8"/>
+  <path d="M256 247c-4 13-5 24 0 29" fill="none" stroke="#bd765f" stroke-linecap="round" stroke-width="6"/>
+  <path d="M195 184c16-10 31-12 46-5M271 179c17-7 32-5 47 5" fill="none" stroke="#283347" stroke-linecap="round" stroke-width="9"/>
+  <path d="M142 466h228" stroke="#d8e4ee" stroke-linecap="round" stroke-width="10"/>
+  <circle cx="406" cy="112" r="20" fill="#e7a63e"/>
+  <path d="m406 98 5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2Z" fill="#fff5d6"/>
+</svg>

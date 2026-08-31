@@ -1,0 +1,27 @@
+:80 {
+  encode gzip
+
+  handle /api/* {
+    reverse_proxy api:8000
+  }
+
+  handle /health {
+    reverse_proxy api:8000
+  }
+
+  handle /media/* {
+    reverse_proxy api:8000
+  }
+
+  handle_path /demos/a/* {
+    reverse_proxy demo-a:80
+  }
+
+  handle_path /demos/b/* {
+    reverse_proxy demo-b:80
+  }
+
+  handle {
+    reverse_proxy web:3000
+  }
+}

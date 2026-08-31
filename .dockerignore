@@ -1,0 +1,10 @@
+node_modules
+.next
+.clone-template
+.git
+docs/design-references
+docs/research
+backend/__pycache__
+**/__pycache__
+*.pyc
+.DS_Store

@@ -1,0 +1,14 @@
+node_modules/
+.next/
+*.tsbuildinfo
+out/
+.env
+.env.*
+!.env.example
+*.log
+backend/__pycache__/
+backend/app/__pycache__/
+.clone-template/
+.clone-template/.git/
+.clone-template/node_modules/
+.DS_Store
