@@ -15,18 +15,82 @@ const categories = [
 
 function categoryFor(person: Person) {
   const value = `${person.group} ${person.role}`.toLowerCase();
-  if (value.includes("faculty") || value.includes("professor") || value.includes("principal investigator") || value.includes("教师") || value.includes("教授")) return "faculty";
-  if (value.includes("alumni") || value.includes("alumnus") || value.includes("alumna") || value.includes("校友") || value.includes("毕业")) return "alumni";
-  if (value.includes("undergraduate") || value.includes("undergrad") || value.includes("本科")) return "undergraduate";
+  if (
+    value.includes("faculty") ||
+    value.includes("professor") ||
+    value.includes("principal investigator") ||
+    value.includes("教师") ||
+    value.includes("教授")
+  )
+    return "faculty";
+  if (
+    value.includes("alumni") ||
+    value.includes("alumnus") ||
+    value.includes("alumna") ||
+    value.includes("校友") ||
+    value.includes("毕业")
+  )
+    return "alumni";
+  if (
+    value.includes("undergraduate") ||
+    value.includes("undergrad") ||
+    value.includes("本科")
+  )
+    return "undergraduate";
   if (value.includes("master") || value.includes("硕士")) return "masters";
-  if (value.includes("phd") || value.includes("doctoral") || value.includes("博士")) return "phd";
-  if (value.includes("research staff") || value.includes("research engineer") || value.includes("科研") || value.includes("研究人员")) return "research-staff";
+  if (
+    value.includes("phd") ||
+    value.includes("doctoral") ||
+    value.includes("博士")
+  )
+    return "phd";
+  if (
+    value.includes("research staff") ||
+    value.includes("research engineer") ||
+    value.includes("科研") ||
+    value.includes("研究人员")
+  )
+    return "research-staff";
   return null;
 }
 
 export default async function PeoplePage() {
   const snapshot = await getSiteSnapshot();
-  const grouped = new Map(categories.map((category) => [category.key, snapshot.people.filter((person) => categoryFor(person) === category.key)]));
-  const uncategorized = snapshot.people.filter((person) => !categoryFor(person));
-  return <><SiteHeader active="people" /><main className="page-main"><div className="container"><header className="page-intro"><h1>People</h1><p>A small, collaborative group working across robotics, machine learning, and systems.</p></header>{categories.map((category) => <PeopleSection key={category.key} title={category.title} people={grouped.get(category.key) ?? []} featured={category.key === "faculty"} />)}{uncategorized.length ? <PeopleSection title="Other lab members" people={uncategorized} /> : null}</div></main><SiteFooter settings={snapshot.settings} /></>;
+  const grouped = new Map(
+    categories.map((category) => [
+      category.key,
+      snapshot.people.filter((person) => categoryFor(person) === category.key),
+    ]),
+  );
+  const uncategorized = snapshot.people.filter(
+    (person) => !categoryFor(person),
+  );
+  return (
+    <>
+      <SiteHeader active="people" />
+      <main className="flex-1 py-5 pb-24">
+        <div className="mx-auto w-[min(var(--container),calc(100%_-_(var(--gutter)*2)))] max-w-none">
+          <header className="max-w-none py-7 pb-[34px] max-[700px]:py-7 max-[700px]:pb-[30px]">
+            <h1 className="sr-only">People</h1>
+            <p className="m-0 max-w-[1000px] border-l-2 border-[var(--accent)] pl-[14px] text-[1.08rem] leading-[1.65] text-[var(--ink-soft)]">
+              A small, collaborative group working across robotics, machine
+              learning, and systems.
+            </p>
+          </header>
+          {categories.map((category) => (
+            <PeopleSection
+              key={category.key}
+              title={category.title}
+              people={grouped.get(category.key) ?? []}
+              featured={category.key === "faculty"}
+            />
+          ))}
+          {uncategorized.length ? (
+            <PeopleSection title="Other lab members" people={uncategorized} />
+          ) : null}
+        </div>
+      </main>
+      <SiteFooter settings={snapshot.settings} />
+    </>
+  );
 }

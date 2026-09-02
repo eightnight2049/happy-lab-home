@@ -21,7 +21,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   FormEvent,
   useCallback,
@@ -57,7 +56,6 @@ type AdminNavItem = {
   label: string;
   icon: LucideIcon;
   hidden?: boolean;
-  href?: string;
   badge?: number;
 };
 type Session = {
@@ -85,9 +83,7 @@ function roleLabel(role?: string | null) {
 }
 
 function AccountBadge({ role }: { role?: string | null }) {
-  const className = role
-    ? `role-badge role-badge--${role}`
-    : "role-badge role-badge--none";
+  const className = `inline-flex items-center whitespace-nowrap rounded-full border border-[var(--line)] px-2 py-1 text-[0.68rem] font-bold leading-none ${role === "admin" ? "border-[#cda7a7] bg-[#fbeaea] text-[var(--accent-deep)]" : role === "contributor" ? "bg-[#f2f2ef] text-[var(--slate)]" : "bg-white text-[var(--slate-light)]"}`;
   return <span className={className}>{roleLabel(role)}</span>;
 }
 
@@ -104,7 +100,6 @@ export function AdminDashboard({
   initialNewsId?: number;
   initialPublicationId?: number;
 }) {
-  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [isSessionLoaded, setSessionLoaded] = useState(false);
   const [view, setView] = useState<AdminView>(initialView);
@@ -200,14 +195,6 @@ export function AdminDashboard({
   }
 
   function navigateView(nextView: AdminView) {
-    if (nextView === "people") {
-      router.push("/studio/people");
-      return;
-    }
-    if (nextView === "profile") {
-      router.push("/studio/profile");
-      return;
-    }
     setView(nextView);
   }
 
@@ -232,13 +219,8 @@ export function AdminDashboard({
     { key: "settings", label: "Site settings", icon: Settings },
     { key: "news", label: "News", icon: Newspaper },
     { key: "publications", label: "Publications", icon: FileText },
-    { key: "people", label: "People", icon: Users, href: "/studio/people" },
-    {
-      key: "profile",
-      label: "My profile",
-      icon: UserRound,
-      href: "/studio/profile",
-    },
+    { key: "people", label: "People", icon: Users },
+    { key: "profile", label: "My profile", icon: UserRound },
     {
       key: "users",
       label: "Account",
@@ -249,13 +231,16 @@ export function AdminDashboard({
 
   if (!isSessionLoaded)
     return (
-      <div className="admin-page">
-        <div className="admin-shell">
+      <div className="min-h-screen overflow-x-hidden bg-[#f7f7f5]">
+        <div className="grid h-screen min-h-screen min-w-0 grid-cols-[250px_minmax(0,1fr)] overflow-hidden max-[700px]:grid-cols-[minmax(0,1fr)] max-[700px]:h-auto max-[700px]:overflow-visible">
           <AdminSidebar nav={nav} view={view} onNavigate={navigateView} />
-          <main className="admin-content">
-            <div className="admin-content__surface">
-              <div className="admin-panel" aria-busy="true">
-                <p className="muted">Loading workspace…</p>
+          <main className="min-w-0 h-screen min-h-0 overflow-hidden p-5 max-[700px]:h-auto max-[700px]:overflow-visible max-[700px]:px-4 max-[700px]:py-[26px] max-[700px]:pb-[54px]">
+            <div className="h-full min-h-0 overflow-y-auto rounded-[14px] border border-[#e0e0dc] bg-white px-[clamp(18px,2.2vw,30px)] pt-[22px] pb-[42px] shadow-[0_8px_24px_-24px_rgba(0,0,0,0.22)] max-[700px]:h-auto max-[700px]:min-h-[calc(100vh-80px)] max-[700px]:overflow-visible max-[700px]:p-[18px]">
+              <div
+                className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]"
+                aria-busy="true"
+              >
+                <p className="text-[var(--slate)]">Loading workspace…</p>
               </div>
             </div>
           </main>
@@ -265,8 +250,8 @@ export function AdminDashboard({
   if (!session) return <LoginCard onLogin={onLogin} initialMode={accessMode} />;
 
   return (
-    <div className="admin-page">
-      <div className="admin-shell">
+    <div className="min-h-screen overflow-x-hidden bg-[#f7f7f5]">
+      <div className="grid h-screen min-h-screen min-w-0 grid-cols-[250px_minmax(0,1fr)] overflow-hidden max-[700px]:grid-cols-[minmax(0,1fr)] max-[700px]:h-auto max-[700px]:overflow-visible">
         <AdminSidebar
           user={session.user}
           nav={nav}
@@ -274,17 +259,20 @@ export function AdminDashboard({
           onNavigate={navigateView}
           onLogout={onLogout}
         />
-        <main className="admin-content">
-          <div className="admin-content__surface">
+        <main className="min-w-0 h-screen min-h-0 overflow-hidden p-5 max-[700px]:h-auto max-[700px]:overflow-visible max-[700px]:px-4 max-[700px]:py-[26px] max-[700px]:pb-[54px]">
+          <div className="h-full min-h-0 overflow-y-auto rounded-[14px] border border-[#e0e0dc] bg-white px-[clamp(18px,2.2vw,30px)] pt-[22px] pb-[42px] shadow-[0_8px_24px_-24px_rgba(0,0,0,0.22)] max-[700px]:h-auto max-[700px]:min-h-[calc(100vh-80px)] max-[700px]:overflow-visible max-[700px]:p-[18px]">
             {!isSnapshotLoaded ? (
-              <div className="admin-panel" aria-busy="true">
-                <p className="muted">Loading workspace…</p>
+              <div
+                className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]"
+                aria-busy="true"
+              >
+                <p className="text-[var(--slate)]">Loading workspace…</p>
               </div>
             ) : snapshotError ? (
-              <div className="admin-panel">
+              <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
                 <p>{snapshotError}</p>
                 <button
-                  className="admin-button admin-button--primary"
+                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
                   type="button"
                   onClick={() => void refreshSnapshot(session.token)}
                 >
@@ -294,14 +282,7 @@ export function AdminDashboard({
             ) : (
               <>
                 {message ? (
-                  <div
-                    className="admin-alert"
-                    style={{
-                      background: "#eef7ee",
-                      color: "#31733d",
-                      marginBottom: 18,
-                    }}
-                  >
+                  <div className="mt-2.5 mb-[18px] rounded-[7px] bg-[#eef7ee] px-3 py-2.5 text-[0.82rem] text-[#31733d]">
                     {message}
                   </div>
                 ) : null}
@@ -461,15 +442,23 @@ function AdminSidebar({
   onLogout?: () => void;
 }) {
   return (
-    <aside className="admin-sidebar">
-      <div className="admin-brand">
-        <span className="site-brand__mark" aria-hidden="true" />
+    <aside className="relative flex h-screen min-w-0 min-h-0 flex-col overflow-y-auto border-r border-[#deded9] bg-white px-[18px] py-[26px] max-[700px]:static max-[700px]:h-auto max-[700px]:min-h-0 max-[700px]:overflow-y-visible max-[700px]:border-r-0 max-[700px]:border-b">
+      <div className="flex items-center gap-2.5 px-2.5 pb-[30px]">
+        <span
+          className="h-[58px] w-[52px] shrink-0 basis-[52px] bg-[url('/Xiaodong-transparent.png')] bg-contain bg-center bg-no-repeat"
+          aria-hidden="true"
+        />
         <div>
-          <strong>MI Lab Portal</strong>
-          <span>Content workspace</span>
+          <strong className="text-[0.95rem]">MI Lab Portal</strong>
+          <span className="block text-[0.68rem] text-[var(--slate)]">
+            Content workspace
+          </span>
         </div>
       </div>
-      <nav className="admin-nav" aria-label="Portal sections">
+      <nav
+        className="grid min-w-0 gap-1 max-[700px]:flex max-[700px]:w-full max-[700px]:overflow-x-auto"
+        aria-label="Portal sections"
+      >
         {nav
           .filter((item) => !item.hidden)
           .map((item) => (
@@ -482,16 +471,23 @@ function AdminSidebar({
           ))}
       </nav>
       {user ? (
-        <div className="admin-sidebar__bottom">
-          <p>
+        <div className="mt-auto flex flex-col items-center border-t border-[var(--line)] px-2.5 pt-4 text-center max-[700px]:mt-[18px]">
+          <p className="mb-2.5 text-[0.78rem]">
             Signed in as <strong>{user.full_name || user.email}</strong>{" "}
             <AccountBadge role={user.role} />
           </p>
-          <div className="admin-sidebar__bottom-actions">
-            <button className="admin-button" type="button" onClick={onLogout}>
+          <div className="flex w-full gap-2">
+            <button
+              className="inline-flex min-h-[42px] min-w-0 flex-1 items-center justify-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-2 py-2 text-[0.78rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+              type="button"
+              onClick={onLogout}
+            >
               <LogOut size={15} /> <span>Sign out</span>
             </button>
-            <Link className="admin-button admin-sidebar__home" href="/">
+            <Link
+              className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[7px] border border-[#efd4d4] bg-[#fffafa] px-2 py-2 text-[0.78rem] font-semibold text-[var(--accent-deep)] whitespace-nowrap hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              href="/"
+            >
               <House size={15} /> <span>Lab home ↗</span>
             </Link>
           </div>
@@ -506,7 +502,7 @@ function AdminNavButton({
   active,
   onClick,
 }: {
-  item: { label: string; icon: LucideIcon; href?: string; badge?: number };
+  item: { label: string; icon: LucideIcon; badge?: number };
   active: boolean;
   onClick: () => void;
 }) {
@@ -514,26 +510,17 @@ function AdminNavButton({
   const content = (
     <>
       <Icon size={16} />
-      <span>{item.label}</span>
-      {item.badge ? <b className="admin-nav__badge">{item.badge}</b> : null}
+      <span className="flex-1">{item.label}</span>
+      {item.badge ? (
+        <b className="min-w-5 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-center font-[var(--mono)] text-[0.66rem] leading-[1.2] text-white">
+          {item.badge}
+        </b>
+      ) : null}
     </>
   );
-  if (item.href)
-    return (
-      <Link
-        className={active ? "is-active" : ""}
-        href={item.href}
-        onClick={(event) => {
-          event.preventDefault();
-          onClick();
-        }}
-      >
-        {content}
-      </Link>
-    );
   return (
     <button
-      className={active ? "is-active" : ""}
+      className={`flex flex-none items-center gap-2.5 rounded-[7px] border-0 bg-transparent px-3 py-[11px] text-left text-[var(--slate)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-deep)] max-[700px]:whitespace-nowrap ${active ? "bg-[var(--accent-soft)] font-bold text-[var(--accent-deep)]" : ""}`}
       type="button"
       onClick={onClick}
     >
@@ -594,40 +581,51 @@ function LoginCard({
   }
 
   return (
-    <div className="login-wrap">
-      <div className="login-card">
-        <div className="admin-brand" style={{ padding: 0 }}>
-          <span className="site-brand__mark" aria-hidden="true" />
+    <div className="grid min-h-screen place-items-center bg-[#f7f7f5] p-6">
+      <div className="w-[min(440px,100%)] rounded-[14px] border border-[#e0e0dc] bg-white p-8 shadow-[0_18px_60px_-30px_rgba(0,0,0,0.3)]">
+        <div className="flex items-center gap-2.5 p-0">
+          <span
+            className="h-[58px] w-[52px] shrink-0 basis-[52px] bg-[url('/Xiaodong-transparent.png')] bg-contain bg-center bg-no-repeat"
+            aria-hidden="true"
+          />
           <div>
-            <strong>MI Lab Portal</strong>
-            <span>Secure content workspace</span>
+            <strong className="text-[0.95rem]">MI Lab Portal</strong>
+            <span className="block text-[0.68rem] text-[var(--slate)]">
+              Secure content workspace
+            </span>
           </div>
         </div>
-        <h1>
+        <h1 className="mt-5 mb-2 text-[2rem]">
           {mode === "login" ? "Welcome back." : "Join the lab workspace."}
         </h1>
-        <p>
+        <p className="text-[var(--slate)]">
           {mode === "login"
             ? "Sign in to update the lab site, publish research, and manage the team."
             : "Create a user account. An admin can grant admin access later."}
         </p>
-        <nav className="login-switch" aria-label="Portal access">
+        <nav
+          className="mt-[22px] grid grid-cols-2 gap-1 rounded-[8px] bg-[var(--bg-muted)] p-1"
+          aria-label="Portal access"
+        >
           <Link
-            className={mode === "login" ? "is-active" : ""}
+            className={`rounded-[6px] px-2.5 py-2 text-center text-[0.85rem] font-semibold ${mode === "login" ? "bg-white text-[var(--ink)] shadow-[0_1px_4px_rgba(0,0,0,0.08)]" : "text-[var(--slate)]"}`}
             href="/studio/login"
           >
             Sign in
           </Link>
           <Link
-            className={mode === "register" ? "is-active" : ""}
+            className={`rounded-[6px] px-2.5 py-2 text-center text-[0.85rem] font-semibold ${mode === "register" ? "bg-white text-[var(--ink)] shadow-[0_1px_4px_rgba(0,0,0,0.08)]" : "text-[var(--slate)]"}`}
             href="/studio/register"
           >
             Register
           </Link>
         </nav>
-        <form className="admin-form" onSubmit={submit}>
+        <form
+          className="mt-[22px] grid grid-cols-1 gap-[14px]"
+          onSubmit={submit}
+        >
           {mode === "register" ? (
-            <div className="admin-field">
+            <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
               <label htmlFor="portal-name">Full name</label>
               <input
                 id="portal-name"
@@ -637,7 +635,7 @@ function LoginCard({
               />
             </div>
           ) : null}
-          <div className="admin-field">
+          <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
             <label htmlFor="portal-email">Email</label>
             <input
               id="portal-email"
@@ -647,7 +645,7 @@ function LoginCard({
               required
             />
           </div>
-          <div className="admin-field">
+          <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
             <label htmlFor="portal-password">Password</label>
             <input
               id="portal-password"
@@ -658,9 +656,9 @@ function LoginCard({
               required
             />
           </div>
-          <div className="admin-form__actions">
+          <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
             <button
-              className="admin-button admin-button--primary"
+              className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
               type="submit"
               disabled={loading}
             >
@@ -672,8 +670,12 @@ function LoginCard({
             </button>
           </div>
         </form>
-        {error ? <div className="admin-alert">{error}</div> : null}
-        <div className="login-note">
+        {error ? (
+          <div className="mt-2.5 rounded-[7px] bg-[#fff0f0] px-3 py-2.5 text-[0.82rem] text-[var(--accent-deep)]">
+            {error}
+          </div>
+        ) : null}
+        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
           This workspace is intentionally separate from the public lab website.
         </div>
       </div>
@@ -700,38 +702,43 @@ function Overview({
   ];
   return (
     <>
-      <div className="admin-grid">
+      <div className="mb-[26px] grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[14px] max-[980px]:grid-cols-2">
         {cards.map((card) => (
-          <div className="stat-card" key={card.label}>
-            <span className="stat-card__label">{card.label}</span>
+          <div
+            className="rounded-[10px] border border-[#e0e0dc] bg-white p-[18px]"
+            key={card.label}
+          >
+            <span className="block text-[0.76rem] text-[var(--slate)]">
+              {card.label}
+            </span>
             <strong>{card.value}</strong>
           </div>
         ))}
       </div>
-      <div className="admin-panel">
-        <div className="admin-panel__header">
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Quick actions</h2>
             <p>Common updates for the public homepage.</p>
           </div>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div className="flex flex-wrap gap-2">
           <button
-            className="admin-button admin-button--primary"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
             type="button"
             onClick={() => onNavigate("settings")}
           >
             <Settings size={15} /> Edit site intro
           </button>
           <button
-            className="admin-button"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
             type="button"
             onClick={() => onNavigate("news")}
           >
             <Newspaper size={15} /> Publish news
           </button>
           <button
-            className="admin-button"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
             type="button"
             onClick={() => onNavigate("publications")}
           >
@@ -739,31 +746,34 @@ function Overview({
           </button>
         </div>
       </div>
-      <div className="admin-panel">
-        <div className="admin-panel__header">
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Recent news</h2>
             <p>Published items and submissions awaiting review.</p>
           </div>
           <button
-            className="admin-button"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
             type="button"
             onClick={() => onNavigate("news")}
           >
             Manage all
           </button>
         </div>
-        <div className="admin-list">
+        <div className="grid gap-[9px]">
           {snapshot.news.slice(0, 3).map((item) => (
-            <div className="admin-list__row" key={item.id}>
-              <div className="admin-list__main">
+            <div
+              className="flex items-center justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:items-start max-[720px]:flex-col"
+              key={item.id}
+            >
+              <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
                 <strong>{item.title}</strong>
                 <span>
                   {formatLongDate(item.date)} · {item.tag ?? "Update"}
                 </span>
               </div>
               <span
-                className={`status-pill ${item.is_published === false ? "is-pending" : ""}`}
+                className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${item.is_published === false ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
               >
                 {item.is_published === false ? "Pending review" : "Published"}
               </span>
@@ -818,15 +828,20 @@ function SettingsPanel({
     }
   }
   return (
-    <div className="admin-panel">
-      <div className="admin-panel__header">
+    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>Public identity</h2>
           <p>These fields power the hero, footer, and metadata.</p>
         </div>
-        <span className="status-pill">Live content</span>
+        <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
+          Live content
+        </span>
       </div>
-      <form className="admin-form" onSubmit={submit}>
+      <form
+        className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
+        onSubmit={submit}
+      >
         <Field
           label="Lab name"
           value={form.name}
@@ -865,9 +880,9 @@ function SettingsPanel({
           textarea
           onChange={(value) => setForm({ ...form, description: value })}
         />
-        <div className="admin-form__actions">
+        <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
           <button
-            className="admin-button admin-button--primary"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
             type="submit"
             disabled={saving}
           >
@@ -901,9 +916,15 @@ function Field({
 }) {
   const fieldId = `admin-field-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
-    <div className={`admin-field ${full ? "full" : ""}`}>
+    <div
+      className={`grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)] ${full ? "col-span-full max-[700px]:col-auto" : ""}`}
+    >
       <label htmlFor={fieldId}>{label}</label>
-      {hint ? <span className="admin-field__hint">{hint}</span> : null}
+      {hint ? (
+        <span className="text-[0.72rem] leading-[1.35] text-[var(--slate-light)]">
+          {hint}
+        </span>
+      ) : null}
       {textarea ? (
         <textarea
           id={fieldId}
@@ -977,8 +998,8 @@ function NewsPanel({
           )
         }
       />
-      <div className="admin-panel">
-        <div className="admin-panel__header">
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>News library</h2>
             <p>
@@ -987,29 +1008,34 @@ function NewsPanel({
             </p>
           </div>
           <button
-            className="admin-button"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
             type="button"
             onClick={() => setEditingId(null)}
           >
             <Plus size={15} /> New news
           </button>
         </div>
-        <div className="admin-list">
+        <div className="grid gap-[9px]">
           {items.map((item) => (
-            <div className="admin-list__row" key={item.id}>
-              <div className="admin-list__main">
+            <div
+              className="flex items-center justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:items-start max-[720px]:flex-col"
+              key={item.id}
+            >
+              <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
                 <strong>{item.title}</strong>
                 <span>
                   {formatLongDate(item.date)} · {item.body}
                 </span>
               </div>
-              <div className="admin-list__actions">
+              <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
                 {item.is_published === false ? (
-                  <span className="status-pill is-pending">Pending review</span>
+                  <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
+                    Pending review
+                  </span>
                 ) : null}
                 {canEdit(item) ? (
                   <button
-                    className="admin-button"
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
                     type="button"
                     onClick={() => setEditingId(item.id)}
                   >
@@ -1018,7 +1044,7 @@ function NewsPanel({
                 ) : null}
                 {accountRole === "admin" ? (
                   <button
-                    className="admin-button admin-button--danger"
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
                     type="button"
                     onClick={() => void deleteItem(item)}
                   >
@@ -1115,8 +1141,8 @@ function NewsEditor({
   }
 
   return (
-    <div className="admin-panel">
-      <div className="admin-panel__header">
+    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>
             {item
@@ -1133,23 +1159,30 @@ function NewsEditor({
                 : "Published items appear on the public homepage immediately."}
           </p>
         </div>
-        <div className="admin-list__actions">
+        <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
           {item ? (
             <span
-              className={`status-pill ${item.is_published === false ? "is-pending" : ""}`}
+              className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${item.is_published === false ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
             >
               {item.is_published === false ? "Pending review" : "Published"}
             </span>
           ) : null}
           {item ? (
-            <button className="admin-button" type="button" onClick={onCancel}>
+            <button
+              className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+              type="button"
+              onClick={onCancel}
+            >
               <X size={15} /> Cancel
             </button>
           ) : null}
         </div>
       </div>
-      <form className="admin-form" onSubmit={submit}>
-        <div className="admin-field">
+      <form
+        className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
+        onSubmit={submit}
+      >
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="news-date">Date</label>
           <input
             id="news-date"
@@ -1163,9 +1196,9 @@ function NewsEditor({
         <Field label="Tag" value={tag} onChange={setTag} />
         <Field label="Homepage link" value={href} onChange={setHref} />
         <Field label="Summary" value={body} full textarea onChange={setBody} />
-        <div className="admin-form__actions">
+        <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
           <button
-            className="admin-button admin-button--primary"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
             type="submit"
             disabled={saving}
           >
@@ -1180,7 +1213,11 @@ function NewsEditor({
           </button>
         </div>
       </form>
-      {message ? <div className="login-note">{message}</div> : null}
+      {message ? (
+        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+          {message}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1238,8 +1275,8 @@ function PublicationsPanel({
           )
         }
       />
-      <div className="admin-panel">
-        <div className="admin-panel__header">
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Publication library</h2>
             <p>
@@ -1248,29 +1285,34 @@ function PublicationsPanel({
             </p>
           </div>
           <button
-            className="admin-button"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
             type="button"
             onClick={() => setEditingId(null)}
           >
             <Plus size={15} /> New publication
           </button>
         </div>
-        <div className="admin-list">
+        <div className="grid gap-[9px]">
           {items.map((item) => (
-            <div className="admin-list__row" key={item.id}>
-              <div className="admin-list__main">
+            <div
+              className="flex items-center justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:items-start max-[720px]:flex-col"
+              key={item.id}
+            >
+              <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
                 <strong>{item.title}</strong>
                 <span>
                   {item.authors} · {item.venue} · {item.year}
                 </span>
               </div>
-              <div className="admin-list__actions">
+              <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
                 {item.is_published === false || item.status === "Draft" ? (
-                  <span className="status-pill is-pending">Pending review</span>
+                  <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
+                    Pending review
+                  </span>
                 ) : null}
                 {canEdit(item) ? (
                   <button
-                    className="admin-button"
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
                     type="button"
                     onClick={() => setEditingId(item.id)}
                   >
@@ -1279,7 +1321,7 @@ function PublicationsPanel({
                 ) : null}
                 {accountRole === "admin" ? (
                   <button
-                    className="admin-button admin-button--danger"
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
                     type="button"
                     onClick={() => void deleteItem(item)}
                   >
@@ -1425,8 +1467,8 @@ function PublicationEditor({
   }
 
   return (
-    <div className="admin-panel">
-      <div className="admin-panel__header">
+    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>{item ? "Edit publication" : "Add a publication"}</h2>
           <p>
@@ -1437,26 +1479,35 @@ function PublicationEditor({
                 : "New entries are submitted for review so an admin can verify the metadata, files, and links."}
           </p>
         </div>
-        <div className="admin-list__actions">
+        <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
           {item ? (
             <span
-              className={`status-pill ${item.is_published === false || item.status === "Draft" ? "is-pending" : ""}`}
+              className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${item.is_published === false || item.status === "Draft" ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
             >
               {item.is_published === false || item.status === "Draft"
                 ? "Pending review"
                 : "Published"}
             </span>
           ) : (
-            <span className="status-pill is-pending">Pending review</span>
+            <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
+              Pending review
+            </span>
           )}
           {item ? (
-            <button className="admin-button" type="button" onClick={onCancel}>
+            <button
+              className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+              type="button"
+              onClick={onCancel}
+            >
               <X size={15} /> Cancel
             </button>
           ) : null}
         </div>
       </div>
-      <form className="admin-form" onSubmit={submit}>
+      <form
+        className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
+        onSubmit={submit}
+      >
         <Field label="Title" value={title} full onChange={setTitle} />
         <Field label="Authors" value={authors} onChange={setAuthors} />
         <Field
@@ -1469,7 +1520,7 @@ function PublicationEditor({
           value={venueShort}
           onChange={setVenueShort}
         />
-        <div className="admin-field">
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="publication-year">Publication year</label>
           <input
             id="publication-year"
@@ -1481,7 +1532,7 @@ function PublicationEditor({
             required
           />
         </div>
-        <div className="admin-field">
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="publication-type">Publication type</label>
           <select
             id="publication-type"
@@ -1504,7 +1555,7 @@ function PublicationEditor({
         <Field label="Homepage link" value={paperUrl} onChange={setPaperUrl} />
         <Field label="Code link" value={codeUrl} onChange={setCodeUrl} />
         <Field label="Video link" value={videoUrl} onChange={setVideoUrl} />
-        <div className="admin-field">
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="publication-file">Paper file (PDF)</label>
           <input
             id="publication-file"
@@ -1513,10 +1564,12 @@ function PublicationEditor({
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
           {item?.pdf_url ? (
-            <small className="muted">Current: {item.pdf_url}</small>
+            <small className="text-[var(--slate)]">
+              Current: {item.pdf_url}
+            </small>
           ) : null}
         </div>
-        <div className="admin-field">
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="publication-thumbnail">Thumbnail</label>
           <input
             id="publication-thumbnail"
@@ -1525,12 +1578,14 @@ function PublicationEditor({
             onChange={(event) => setThumbnail(event.target.files?.[0] ?? null)}
           />
           {item?.thumbnail_url ? (
-            <small className="muted">Current: {item.thumbnail_url}</small>
+            <small className="text-[var(--slate)]">
+              Current: {item.thumbnail_url}
+            </small>
           ) : null}
         </div>
-        <div className="admin-form__actions">
+        <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
           <button
-            className="admin-button admin-button--primary"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
             type="submit"
             disabled={saving}
           >
@@ -1543,7 +1598,11 @@ function PublicationEditor({
           </button>
         </div>
       </form>
-      {message ? <div className="login-note">{message}</div> : null}
+      {message ? (
+        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+          {message}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1667,8 +1726,8 @@ function ReviewQueuePanel({
     person: "People profile",
   } as const;
   return (
-    <div className="admin-panel">
-      <div className="admin-panel__header">
+    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>Unified review queue</h2>
           <p>
@@ -1676,12 +1735,20 @@ function ReviewQueuePanel({
             here. Edit first when details need correction, then publish.
           </p>
         </div>
-        <span className="status-pill is-pending">{items.length} pending</span>
+        <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
+          {items.length} pending
+        </span>
       </div>
-      {message ? <div className="login-note">{message}</div> : null}
-      {loading ? <p className="muted">Loading submissions…</p> : null}
+      {message ? (
+        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+          {message}
+        </div>
+      ) : null}
+      {loading ? (
+        <p className="text-[var(--slate)]">Loading submissions…</p>
+      ) : null}
       {!loading && !items.length ? (
-        <div className="review-empty">
+        <div className="flex items-start gap-3 px-0 py-[18px] pb-1 text-[#31733d]">
           <CheckCircle2 size={20} />
           <div>
             <strong>Nothing is waiting for review.</strong>
@@ -1689,27 +1756,35 @@ function ReviewQueuePanel({
           </div>
         </div>
       ) : null}
-      <div className="admin-list">
+      <div className="grid gap-[9px]">
         {items.map((item) => {
           const key = `${item.content_type}-${item.id}`;
           const canDelete =
             accountRole === "admin" || item.content_type !== "person";
           return (
-            <div className="admin-list__row review-queue-row" key={key}>
-              <div className="admin-list__main">
-                <span className="review-queue-row__type">
+            <div
+              className="flex items-start justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:flex-col"
+              key={key}
+            >
+              <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
+                <span className="font-[var(--mono)] text-[0.68rem] font-bold uppercase tracking-[0.06em] text-[var(--accent-deep)]">
                   {contentLabels[item.content_type]}
                 </span>
                 <strong>{item.title}</strong>
                 <span>{item.summary}</span>
               </div>
-              <div className="admin-list__actions">
-                <span className="status-pill is-pending">Pending review</span>
-                <Link className="admin-button" href={editHref(item)}>
+              <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
+                <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
+                  Pending review
+                </span>
+                <Link
+                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                  href={editHref(item)}
+                >
                   <Pencil size={14} /> Edit
                 </Link>
                 <button
-                  className="admin-button admin-button--primary"
+                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
                   type="button"
                   disabled={workingKey === key}
                   onClick={() => void publish(item)}
@@ -1718,7 +1793,7 @@ function ReviewQueuePanel({
                 </button>
                 {canDelete ? (
                   <button
-                    className="admin-button admin-button--danger"
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
                     type="button"
                     disabled={workingKey === key}
                     onClick={() => void remove(item)}
@@ -1860,8 +1935,8 @@ function PeoplePanel({
   );
 
   return (
-    <div className="admin-panel admin-people-directory">
-      <div className="admin-panel__header admin-people-directory__header">
+    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <div className="mb-[14px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>People directory</h2>
           <p>
@@ -1869,7 +1944,7 @@ function PeoplePanel({
             public People page.
           </p>
         </div>
-        <span className="status-pill">
+        <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
           {filteredPeople.length}
           {filteredPeople.length !== people.length
             ? ` of ${people.length}`
@@ -1877,9 +1952,12 @@ function PeoplePanel({
           {filteredPeople.length === 1 ? "member" : "members"}
         </span>
       </div>
-      <label className="admin-people-search">
-        <span>Search people</span>
+      <label className="mb-[22px] grid gap-1.5">
+        <span className="text-[0.78rem] font-semibold text-[var(--slate)]">
+          Search people
+        </span>
         <input
+          className="w-full rounded-[7px] border border-[#d8d8d2] bg-white px-3 py-[11px] text-[0.9rem] text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -1890,29 +1968,37 @@ function PeoplePanel({
         visibleCategories.map((category) => {
           const members = grouped.get(category.key) ?? [];
           return (
-            <section className="admin-people-group" key={category.key}>
-              <div className="admin-people-group__header">
-                <h3>{category.title}</h3>
-                <span>
+            <section
+              className="mt-6 border-t border-[var(--line)] pt-[18px] first:mt-0 first:border-t-0 first:pt-0"
+              key={category.key}
+            >
+              <div className="mb-1 flex items-baseline justify-between gap-3">
+                <h3 className="m-0 text-[0.94rem]">{category.title}</h3>
+                <span className="font-[var(--mono)] text-[0.68rem] text-[var(--slate-light)]">
                   {members.length} {members.length === 1 ? "member" : "members"}
                 </span>
               </div>
               {members.length ? (
-                <div className="admin-people-grid">
+                <div className="grid items-start gap-[14px] [grid-template-columns:repeat(auto-fill,minmax(210px,1fr))] max-[1100px]:grid-cols-3 max-[700px]:grid-cols-2">
                   {members.map((person) => (
-                    <article className="admin-person-card" key={person.id}>
-                      <div className="admin-person-card__identity">
+                    <article
+                      className="relative block min-w-0 rounded-[8px] border border-[var(--line-soft)] bg-white p-3"
+                      key={person.id}
+                    >
+                      <div className="flex min-w-0 items-start gap-2.5">
                         <PersonAvatar
                           person={person}
-                          className="admin-person-card__avatar"
+                          className="!h-14 !w-14 rounded-[8px] text-[1.1rem] [flex:0_0_56px] !m-0"
                         />
-                        <div className="admin-person-card__details">
-                          <div className="admin-person-card__top">
-                            <strong>{person.name}</strong>
-                            <span className="admin-person-card__signals">
+                        <div className="min-w-0">
+                          <div className="flex items-start justify-start gap-2 pr-7">
+                            <strong className="min-w-0 [overflow-wrap:anywhere] text-[0.92rem] leading-[1.25]">
+                              {person.name}
+                            </strong>
+                            <span className="absolute top-3 right-3 inline-flex items-center gap-[5px]">
                               {person.account_role === "admin" ? (
                                 <span
-                                  className="admin-person-card__admin-icon"
+                                  className="inline-flex size-[25px] items-center justify-center rounded-[7px] border border-[#cda7a7] bg-[#fbeaea] text-[var(--accent-deep)]"
                                   title="Admin"
                                   aria-label="Admin"
                                 >
@@ -1920,24 +2006,24 @@ function PeoplePanel({
                                 </span>
                               ) : null}
                               {person.is_visible === false ? (
-                                <span className="status-pill is-pending">
+                                <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
                                   Pending
                                 </span>
                               ) : null}
                             </span>
                           </div>
-                          <p className="admin-person-card__role">
+                          <p className="mt-1 m-0 text-[0.78rem] leading-[1.35] text-[var(--slate)]">
                             {person.role}
                           </p>
-                          <p className="admin-person-card__group">
+                          <p className="mt-0.5 m-0 text-[0.72rem] italic leading-[1.35] text-[var(--slate-light)]">
                             {person.group}
                           </p>
                         </div>
                       </div>
-                      <div className="admin-person-card__actions">
+                      <div className="mt-[14px] flex flex-wrap gap-1.5 [&>a]:min-h-8 [&>a]:flex-1 [&>a]:justify-center [&>a]:px-2 [&>a]:py-1.5 [&>a]:text-[0.7rem] [&>button]:min-h-8 [&>button]:flex-1 [&>button]:justify-center [&>button]:px-2 [&>button]:py-1.5 [&>button]:text-[0.7rem]">
                         {accountRole === "admin" ? (
                           <Link
-                            className="admin-button"
+                            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
                             href={`/studio/profile?personId=${person.id}`}
                           >
                             <Pencil size={13} /> Edit
@@ -1945,7 +2031,7 @@ function PeoplePanel({
                         ) : null}
                         {accountRole === "admin" ? (
                           <button
-                            className="admin-button admin-button--danger"
+                            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
                             type="button"
                             disabled={deletingId === person.id}
                             onClick={() => void deletePerson(person)}
@@ -1959,7 +2045,7 @@ function PeoplePanel({
                   ))}
                 </div>
               ) : (
-                <p className="admin-people-group__empty">
+                <p className="mt-2 text-[0.78rem] text-[var(--slate-light)]">
                   No members in this category
                   {hasQuery ? " match your search" : " yet"}.
                 </p>
@@ -1968,11 +2054,15 @@ function PeoplePanel({
           );
         })
       ) : (
-        <div className="admin-people-search-empty">
+        <div className="px-0 py-5 pb-1 text-[0.84rem] text-[var(--slate-light)]">
           No people match “{query.trim()}”.
         </div>
       )}
-      {message ? <div className="login-note">{message}</div> : null}
+      {message ? (
+        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+          {message}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2041,14 +2131,17 @@ function ProfilePanel({
 
   if (selectedPersonId && !requestedProfile) {
     return (
-      <div className="admin-panel">
-        <div className="admin-panel__header">
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Profile not found</h2>
             <p>This member profile is no longer available in the directory.</p>
           </div>
         </div>
-        <Link className="admin-button" href="/studio">
+        <Link
+          className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+          href="/studio"
+        >
           Back to portal
         </Link>
       </div>
@@ -2057,15 +2150,17 @@ function ProfilePanel({
 
   if (!canEdit) {
     return (
-      <div className="admin-panel">
-        <div className="admin-panel__header">
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>My profile</h2>
             <p>You can only edit the profile connected to your own account.</p>
           </div>
-          <span className="status-pill">View only</span>
+          <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
+            View only
+          </span>
         </div>
-        <p className="muted">
+        <p className="text-[var(--slate)]">
           Open My profile from the portal navigation to submit your own member
           information.
         </p>
@@ -2228,8 +2323,8 @@ function ProfileEditor({
   }
 
   return (
-    <div className="admin-panel profile-editor">
-      <div className="admin-panel__header">
+    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>
             {isEditingAnotherProfile
@@ -2244,12 +2339,21 @@ function ProfileEditor({
               : "Maintain the profile information shown in the public People directory."}
           </p>
         </div>
-        <span className={`status-pill ${pending ? "is-pending" : ""}`}>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${pending ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
+        >
           {pending ? "Pending review" : profile ? "Published" : "New profile"}
         </span>
       </div>
-      {message ? <div className="login-note">{message}</div> : null}
-      <form className="admin-form" onSubmit={save}>
+      {message ? (
+        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+          {message}
+        </div>
+      ) : null}
+      <form
+        className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
+        onSubmit={save}
+      >
         <Field
           label="Name"
           value={draft.name}
@@ -2260,7 +2364,7 @@ function ProfileEditor({
           value={draft.role}
           onChange={(value) => setDraft({ ...draft, role: value })}
         />
-        <div className="admin-field">
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="profile-person-group">Directory category</label>
           <select
             id="profile-person-group"
@@ -2287,7 +2391,7 @@ function ProfileEditor({
           onChange={(value) => setDraft({ ...draft, email: value })}
         />
         {canSetPermission ? (
-          <div className="admin-field">
+          <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
             <label htmlFor="profile-account-role">Account permission</label>
             <select
               id="profile-account-role"
@@ -2299,7 +2403,7 @@ function ProfileEditor({
               <option value="contributor">User</option>
               <option value="admin">Admin</option>
             </select>
-            <small className="admin-field__hint">
+            <small className="text-[0.72rem] leading-[1.35] text-[var(--slate-light)]">
               Only admins can change account permissions. The lab can have up to
               five admins.
             </small>
@@ -2325,7 +2429,7 @@ function ProfileEditor({
           textarea
           onChange={(value) => setDraft({ ...draft, bio: value })}
         />
-        <div className="admin-field">
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="profile-avatar">Portrait</label>
           <input
             ref={avatarInput}
@@ -2335,9 +2439,9 @@ function ProfileEditor({
             onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
           />
         </div>
-        <div className="admin-form__actions">
+        <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
           <button
-            className="admin-button admin-button--primary"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
             type="submit"
             disabled={saving}
           >
@@ -2440,20 +2544,25 @@ function PeopleCreatePanel({
   }
 
   return (
-    <div className="admin-panel">
-      <div className="admin-panel__header">
+    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>
             <Plus size={18} /> Add a person
           </h2>
           <p>Add a complete profile directly to the public People directory.</p>
         </div>
-        <span className="status-pill">Publish access</span>
+        <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
+          Publish access
+        </span>
       </div>
-      <form className="admin-form" onSubmit={submit}>
+      <form
+        className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
+        onSubmit={submit}
+      >
         <Field label="Name" value={name} onChange={setName} />
         <Field label="Role or title" value={jobTitle} onChange={setJobTitle} />
-        <div className="admin-field">
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="new-person-group">Directory category</label>
           <select
             id="new-person-group"
@@ -2485,7 +2594,7 @@ function PeopleCreatePanel({
           onChange={setInterests}
         />
         <Field label="Bio" value={bio} full textarea onChange={setBio} />
-        <div className="admin-field">
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
           <label htmlFor="new-person-avatar">Portrait</label>
           <input
             id="new-person-avatar"
@@ -2494,9 +2603,9 @@ function PeopleCreatePanel({
             onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
           />
         </div>
-        <div className="admin-form__actions">
+        <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
           <button
-            className="admin-button admin-button--primary"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
             type="submit"
             disabled={saving}
           >
@@ -2505,7 +2614,11 @@ function PeopleCreatePanel({
           </button>
         </div>
       </form>
-      {message ? <div className="login-note">{message}</div> : null}
+      {message ? (
+        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+          {message}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2656,8 +2769,8 @@ function UsersPanel({
 
   return (
     <>
-      <div className="admin-panel">
-        <div className="admin-panel__header">
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Create collaborator account</h2>
             <p>
@@ -2665,9 +2778,14 @@ function UsersPanel({
               remains reliable.
             </p>
           </div>
-          <span className="status-pill">Admin only</span>
+          <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
+            Admin only
+          </span>
         </div>
-        <form className="admin-form" onSubmit={createAccount}>
+        <form
+          className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
+          onSubmit={createAccount}
+        >
           <Field label="Full name" value={fullName} onChange={setFullName} />
           <Field label="Email" value={email} onChange={setEmail} />
           <Field
@@ -2675,7 +2793,7 @@ function UsersPanel({
             value={password}
             onChange={setPassword}
           />
-          <div className="admin-field">
+          <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
             <label htmlFor="new-user-role">Role</label>
             <select
               id="new-user-role"
@@ -2686,9 +2804,9 @@ function UsersPanel({
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div className="admin-form__actions">
+          <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
             <button
-              className="admin-button admin-button--primary"
+              className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
               type="submit"
               disabled={saving}
             >
@@ -2697,10 +2815,14 @@ function UsersPanel({
             </button>
           </div>
         </form>
-        {message ? <div className="login-note">{message}</div> : null}
+        {message ? (
+          <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+            {message}
+          </div>
+        ) : null}
       </div>
-      <div className="admin-panel">
-        <div className="admin-panel__header">
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Accounts</h2>
             <p>
@@ -2708,20 +2830,23 @@ function UsersPanel({
               removed here.
             </p>
           </div>
-          <span className="status-pill">
+          <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
             {adminCount}/5 admins · {users.length} accounts
           </span>
         </div>
-        <div className="admin-list">
+        <div className="grid gap-[9px]">
           {users.map((user) => (
-            <div className="admin-list__row" key={user.id}>
-              <div className="admin-list__main">
+            <div
+              className="flex items-center justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:items-start max-[720px]:flex-col"
+              key={user.id}
+            >
+              <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
                 <strong>{user.full_name || user.email}</strong>
                 <span>
                   {user.email} · {user.is_active ? "Active" : "Paused"}
                 </span>
               </div>
-              <div className="admin-list__actions">
+              <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
                 <select
                   aria-label={`Role for ${user.email}`}
                   value={user.role}
@@ -2738,7 +2863,7 @@ function UsersPanel({
                   <option value="admin">Admin</option>
                 </select>
                 <button
-                  className="admin-button admin-button--danger"
+                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
                   type="button"
                   disabled={
                     savingUserId === user.id || user.id === currentUserId
