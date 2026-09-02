@@ -12,3 +12,5 @@ backend/app/__pycache__/
 .clone-template/.git/
 .clone-template/node_modules/
 .DS_Store
+.venv
+AGENTS.md
