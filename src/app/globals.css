@@ -172,6 +172,20 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .interest-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 0; padding: 0; list-style: none; }
 .interest-list li { padding: 4px 8px; border-radius: 4px; background: var(--bg-muted); color: var(--slate); font-size: .76rem; }
 .profile-card__links { margin-top: 18px; }
+.person-dialog { position: fixed; inset: 0; width: min(560px, calc(100% - 32px)); max-width: 560px; margin: auto; padding: 0; border: 0; border-radius: var(--radius-lg); background: transparent; color: var(--ink); box-shadow: 0 24px 80px rgba(0,0,0,.24); }
+.person-dialog::backdrop { background: rgba(17,17,17,.46); backdrop-filter: blur(2px); }
+.person-dialog__surface { position: relative; padding: 28px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: #fff; }
+.person-dialog__close { position: absolute; top: 12px; right: 14px; width: 32px; height: 32px; border: 0; background: transparent; color: var(--slate); font-size: 1.35rem; line-height: 32px; text-align: center; cursor: pointer; }
+.person-dialog__close:hover { color: var(--accent-deep); }
+.person-dialog__identity { display: flex; align-items: center; gap: 18px; padding-right: 36px; }
+.person-dialog__avatar { flex: 0 0 112px; width: 112px; margin: 0; border-radius: 12px; }
+.person-dialog h2 { margin: 0 0 6px; font-size: 1.6rem; }
+.person-dialog h3 { margin: 22px 0 0; font-size: .86rem; text-transform: uppercase; letter-spacing: .08em; }
+.person-dialog__meta { margin: 0; color: var(--slate); }
+.person-dialog__meta strong { color: var(--ink); }
+.person-dialog__bio { margin: 24px 0 0; line-height: 1.6; }
+.person-dialog .interest-list { margin-top: 10px; }
+.person-dialog__links { margin: 22px 0 0; }
 .people-pagination { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line-soft); color: var(--slate); font-size: .82rem; }
 .people-pagination__pages { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .people-pagination button { display: inline-flex; min-width: 34px; height: 34px; align-items: center; justify-content: center; padding: 5px 9px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--ink-soft); font-size: .82rem; }

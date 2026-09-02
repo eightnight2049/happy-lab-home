@@ -33,11 +33,16 @@ function AccountBadge({ role }: { role?: string | null }) {
 export function AdminDashboard({ accessMode = "login", initialView = "overview", profilePersonId, initialNewsId, initialPublicationId }: { accessMode?: "login" | "register"; initialView?: AdminView; profilePersonId?: number; initialNewsId?: number; initialPublicationId?: number }) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
+  const [isSessionLoaded, setSessionLoaded] = useState(false);
   const [view, setView] = useState<AdminView>(initialView);
   const [snapshot, setSnapshot] = useState<SiteSnapshot>(fallbackSnapshot);
+  const [isSnapshotLoaded, setSnapshotLoaded] = useState(false);
+  const [snapshotError, setSnapshotError] = useState("");
   const [message, setMessage] = useState("");
 
   async function refreshSnapshot(token?: string) {
+    setSnapshotLoaded(false);
+    setSnapshotError("");
     try {
       const response = await fetch(`${apiBase}/api/public/home`, { cache: "no-store", headers: token ? { Authorization: `Bearer ${token}` } : undefined });
       if (response.ok) {
@@ -51,17 +56,26 @@ export function AdminDashboard({ accessMode = "login", initialView = "overview",
           if (peopleResponse.ok) nextSnapshot.people = await peopleResponse.json() as Person[];
         }
         setSnapshot(nextSnapshot);
+        setSnapshotLoaded(true);
+      } else {
+        setSnapshotError("Could not load the workspace. Check your connection and try again.");
+        setSnapshotLoaded(true);
       }
-    } catch { /* The dashboard keeps a local demo state when the API is offline. */ }
+    } catch {
+      setSnapshotError("Could not load the workspace. Check your connection and try again.");
+      setSnapshotLoaded(true);
+    }
   }
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("motion-lab-session");
-    if (saved) {
-      window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
+      const saved = window.localStorage.getItem("motion-lab-session");
+      if (saved) {
         try { setSession(normalizeSession(JSON.parse(saved) as Session)); } catch { window.localStorage.removeItem("motion-lab-session"); }
-      }, 0);
-    }
+      }
+      setSessionLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -71,6 +85,8 @@ export function AdminDashboard({ accessMode = "login", initialView = "overview",
   }, [session]);
 
   function onLogin(next: Session) {
+    setSnapshotLoaded(false);
+    setSnapshotError("");
     const normalized = normalizeSession(next);
     setSession(normalized);
     window.localStorage.setItem("motion-lab-session", JSON.stringify(normalized));
@@ -79,6 +95,8 @@ export function AdminDashboard({ accessMode = "login", initialView = "overview",
 
   function onLogout() {
     setSession(null);
+    setSnapshotLoaded(false);
+    setSnapshotError("");
     window.localStorage.removeItem("motion-lab-session");
   }
 
@@ -94,6 +112,7 @@ export function AdminDashboard({ accessMode = "login", initialView = "overview",
     setView(nextView);
   }
 
+  if (!isSessionLoaded) return <div className="admin-page"><div className="admin-shell"><LoadingSidebar /><main className="admin-content"><div className="admin-content__surface"><div className="admin-panel" aria-busy="true"><p className="muted">Loading workspace…</p></div></div></main></div></div>;
   if (!session) return <LoginCard onLogin={onLogin} initialMode={accessMode} />;
 
   const canManageUsers = session.user.role === "admin";
@@ -122,6 +141,7 @@ export function AdminDashboard({ accessMode = "login", initialView = "overview",
         </aside>
         <main className="admin-content">
           <div className="admin-content__surface">
+            {!isSnapshotLoaded ? <div className="admin-panel" aria-busy="true"><p className="muted">Loading workspace…</p></div> : snapshotError ? <div className="admin-panel"><p>{snapshotError}</p><button className="admin-button admin-button--primary" type="button" onClick={() => void refreshSnapshot(session.token)}>Try again</button></div> : <>
             {message ? <div className="admin-alert" style={{ background: "#eef7ee", color: "#31733d", marginBottom: 18 }}>{message}</div> : null}
             {view === "overview" ? <Overview snapshot={snapshot} onNavigate={setView} /> : null}
             {view === "settings" ? <SettingsPanel settings={snapshot.settings} token={session.token} onSaved={(settings) => { setSnapshot((current) => ({ ...current, settings })); setMessage("Site settings saved. Refresh the public site to see the update."); }} onError={setMessage} /> : null}
@@ -131,11 +151,17 @@ export function AdminDashboard({ accessMode = "login", initialView = "overview",
             {view === "people" ? <><PeoplePanel people={snapshot.people} token={session.token} accountRole={session.user.role} onChanged={(people) => setSnapshot((current) => ({ ...current, people }))} /><PeopleCreatePanel people={snapshot.people} token={session.token} accountRole={session.user.role} onChanged={(people) => setSnapshot((current) => ({ ...current, people }))} /></> : null}
             {view === "profile" ? <ProfilePanel people={snapshot.people} token={session.token} user={session.user} selectedPersonId={profilePersonId} onChanged={(people) => setSnapshot((current) => ({ ...current, people }))} onReturnToPeople={() => navigateView("people")} /> : null}
             {view === "users" && canManageUsers ? <UsersPanel token={session.token} currentUserId={session.user.id} /> : null}
+            </>}
           </div>
         </main>
       </div>
     </div>
   );
+}
+
+function LoadingSidebar() {
+  const nav = [{ key: "overview" as const, label: "Overview", icon: Gauge }, { key: "settings" as const, label: "Site settings", icon: Settings }, { key: "news" as const, label: "News", icon: Newspaper }, { key: "publications" as const, label: "Publications", icon: FileText }, { key: "people" as const, label: "People", icon: Users }, { key: "profile" as const, label: "My profile", icon: UserRound }];
+  return <aside className="admin-sidebar"><div className="admin-brand"><span className="site-brand__mark" aria-hidden="true" /><div><strong>MI Lab Portal</strong><span>Content workspace</span></div></div><nav className="admin-nav" aria-label="Portal sections">{nav.map((item) => <AdminNavButton key={item.key} item={item} active={false} onClick={() => undefined} />)}</nav></aside>;
 }
 
 function AdminNavButton({ item, active, onClick }: { item: { label: string; icon: LucideIcon; href?: string; badge?: number }; active: boolean; onClick: () => void }) {

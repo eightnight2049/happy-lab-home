@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Person } from "@/lib/types";
-import { PeopleGrid, PersonAvatar } from "@/components/site/people-grid";
+import { PeopleGrid, PersonAvatar, PersonProfileDialog } from "@/components/site/people-grid";
 
 const PEOPLE_PER_PAGE = 6;
 
@@ -30,7 +30,7 @@ export function PeopleSection({ title, people, featured = false }: { title: stri
         <article className="profile-card">
           <PersonAvatar person={featuredPerson} className="profile-card__avatar" />
           <div>
-            <h3>{featuredPerson.name}</h3>
+            <h3><PersonProfileDialog person={featuredPerson} className="profile-card__name-button">{featuredPerson.name}</PersonProfileDialog></h3>
             <p className="profile-card__meta"><strong>{featuredPerson.role}</strong> · {featuredPerson.group}</p>
             <p>{featuredPerson.bio}</p>
             <ul className="interest-list">{featuredPerson.research_interests.map((interest) => <li key={interest}>{interest}</li>)}</ul>
