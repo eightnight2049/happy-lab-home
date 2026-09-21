@@ -1,10 +1,10 @@
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 
 export const metadata = {
-  title: "Lab Portal · Motion Intelligence Lab",
+  title: "Accounts · MI Lab Portal",
   robots: { index: false, follow: false },
 };
 
-export default function StudioPage() {
-  return <AdminDashboard initialView="overview" />;
+export default function AccountsAdminPage() {
+  return <AdminDashboard initialView="users" />;
 }

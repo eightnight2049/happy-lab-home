@@ -1,4 +1,5 @@
 import { getSiteSnapshot } from "@/lib/api";
+import { AlumniSection } from "@/components/site/alumni-section";
 import { PeopleSection } from "@/components/site/people-section";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
@@ -9,8 +10,6 @@ const categories = [
   { key: "phd", title: "PhD students" },
   { key: "masters", title: "Master's students" },
   { key: "undergraduate", title: "Undergraduate students" },
-  { key: "research-staff", title: "Research staff" },
-  { key: "alumni", title: "Alumni" },
 ] as const;
 
 function categoryFor(person: Person) {
@@ -62,8 +61,8 @@ export default async function PeoplePage() {
       snapshot.people.filter((person) => categoryFor(person) === category.key),
     ]),
   );
-  const uncategorized = snapshot.people.filter(
-    (person) => !categoryFor(person),
+  const alumni = snapshot.people.filter(
+    (person) => categoryFor(person) === "alumni",
   );
   return (
     <>
@@ -85,9 +84,7 @@ export default async function PeoplePage() {
               featured={category.key === "faculty"}
             />
           ))}
-          {uncategorized.length ? (
-            <PeopleSection title="Other lab members" people={uncategorized} />
-          ) : null}
+          <AlumniSection people={alumni} />
         </div>
       </main>
       <SiteFooter settings={snapshot.settings} />

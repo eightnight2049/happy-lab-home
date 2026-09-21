@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { LabSettings } from "@/lib/types";
 
@@ -68,12 +69,12 @@ export function HeroCarousel({ settings }: { settings: LabSettings }) {
           >
             Publications
           </a>
-          <a
+          <Link
             className="inline-flex min-h-[51px] items-center justify-center rounded-[var(--radius)] border-[1.5px] border-white/55 bg-transparent px-[21px] py-[11px] text-base font-semibold tracking-[0.01em] text-white transition-all hover:border-white hover:[background-color:rgba(255,255,255,0.12)]"
             href="/people"
           >
             People
-          </a>
+          </Link>
           <a
             className="inline-flex min-h-[51px] items-center justify-center rounded-[var(--radius)] border-[1.5px] border-white/55 bg-transparent px-[21px] py-[11px] text-base font-semibold tracking-[0.01em] text-white transition-all hover:border-white hover:[background-color:rgba(255,255,255,0.12)]"
             href="/join"

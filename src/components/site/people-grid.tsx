@@ -2,6 +2,13 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  displayEducationLevel,
+  displayPersonMajor,
+  displayPersonName,
+  displayPersonRole,
+  isStudentPerson,
+} from "@/lib/person";
 import type { Person } from "@/lib/types";
 
 function initials(name: string) {
@@ -25,7 +32,7 @@ export function PersonAvatar({
   return (
     <div
       className={`relative flex aspect-square w-[min(100%,150px)] items-center justify-center overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line-soft)] bg-[linear-gradient(135deg,#f7f7f7,#e8e8e8)] text-[2.1rem] font-bold tracking-[-0.05em] text-[var(--accent)] mb-2.5 ${person.avatar_url ? "text-transparent" : ""} ${isLabMark ? "bg-white" : ""} ${className}`}
-      aria-label={`${person.name} portrait`}
+      aria-label={`${displayPersonName(person)} portrait`}
     >
       {person.avatar_url ? (
         <Image
@@ -52,6 +59,11 @@ export function PersonProfileDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
+  const isStudent = isStudentPerson(person);
+  const role = displayPersonRole(person);
+  const isAlumni = /alumni|alumnus|alumna|校友|毕业/i.test(
+    `${person.group} ${person.role}`,
+  );
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -95,33 +107,24 @@ export function PersonProfileDialog({
                 className="mb-1.5 text-[1.6rem]"
                 id={`person-dialog-title-${person.id}`}
               >
-                {person.name}
+                {displayPersonName(person)}
               </h2>
               <p className="m-0 text-[var(--slate)]">
-                <strong className="text-[var(--ink)]">{person.role}</strong> ·{" "}
-                {person.group}
+                <strong className="text-[var(--ink)]">
+                  {isAlumni
+                    ? displayEducationLevel(person)
+                    : isStudent
+                      ? displayPersonMajor(person)
+                      : role}
+                </strong>
+                {!isStudent && !isAlumni && role === person.role && person.group
+                  ? ` · ${person.group}`
+                  : null}
               </p>
             </div>
           </div>
           {person.bio ? (
             <p className="mt-6 leading-[1.6]">{person.bio}</p>
-          ) : null}
-          {person.research_interests.length ? (
-            <>
-              <h3 className="mt-[22px] text-[0.86rem] uppercase tracking-[0.08em]">
-                Research interests
-              </h3>
-              <ul className="mt-2.5 flex flex-wrap gap-1.5 m-0 list-none p-0">
-                {person.research_interests.map((interest) => (
-                  <li
-                    className="rounded-[4px] bg-[var(--bg-muted)] px-2 py-1 text-[0.76rem] text-[var(--slate)]"
-                    key={interest}
-                  >
-                    {interest}
-                  </li>
-                ))}
-              </ul>
-            </>
           ) : null}
           {person.email || person.website_url ? (
             <p className="mt-[22px]">
@@ -135,6 +138,26 @@ export function PersonProfileDialog({
                 </>
               ) : null}
             </p>
+          ) : null}
+          {person.enrollment_year || person.destination ? (
+            <dl className="mt-[18px] grid gap-2 text-[0.9rem] text-[var(--slate)]">
+              {person.enrollment_year ? (
+                <div className="flex gap-3">
+                  <dt className="min-w-[82px] font-semibold text-[var(--ink)]">
+                    Entry year
+                  </dt>
+                  <dd className="m-0">{person.enrollment_year}</dd>
+                </div>
+              ) : null}
+              {person.destination ? (
+                <div className="flex gap-3">
+                  <dt className="min-w-[82px] font-semibold text-[var(--ink)]">
+                    Destination
+                  </dt>
+                  <dd className="m-0">{person.destination}</dd>
+                </div>
+              ) : null}
+            </dl>
           ) : null}
         </div>
       </dialog>
@@ -153,15 +176,19 @@ export function PeopleGrid({ people }: { people: Person[] }) {
               person={person}
               className="m-0 cursor-pointer border-0 bg-transparent p-0 text-left font-inherit text-inherit hover:text-[var(--accent-deep)] hover:underline hover:underline-offset-3"
             >
-              {person.name}
+              {displayPersonName(person)}
             </PersonProfileDialog>
           </h3>
           <p className="m-0 text-[0.82rem] leading-[1.4] text-[var(--slate)]">
-            {person.role}
+            {isStudentPerson(person)
+              ? displayPersonMajor(person)
+              : displayPersonRole(person)}
           </p>
-          <p className="mt-0.5 m-0 text-[0.76rem] italic leading-[1.35] text-[var(--slate-light)]">
-            {person.group}
-          </p>
+          {!isStudentPerson(person) && displayPersonRole(person) === person.role ? (
+            <p className="mt-0.5 m-0 text-[0.76rem] italic leading-[1.35] text-[var(--slate-light)]">
+              {person.group}
+            </p>
+          ) : null}
         </li>
       ))}
     </ul>

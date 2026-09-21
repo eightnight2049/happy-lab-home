@@ -1,17 +1,24 @@
 "use client";
 
+import Link from "next/link";
+import { Globe, Mail } from "lucide-react";
 import { useState } from "react";
+import {
+  displayPersonName,
+  displayPersonRole,
+  personProfileHref,
+  personSummary,
+} from "@/lib/person";
 import type { Person } from "@/lib/types";
 import {
   PeopleGrid,
   PersonAvatar,
-  PersonProfileDialog,
 } from "@/components/site/people-grid";
 
 const PEOPLE_PER_PAGE = 6;
 
 function memberLabel(count: number) {
-  return `${count} ${count === 1 ? "member" : "members"}`;
+  return count > 1 ? `${count} members` : "";
 }
 
 export function PeopleSection({
@@ -37,9 +44,11 @@ export function PeopleSection({
       <div className="mb-5 flex items-center justify-between gap-5 border-b border-[var(--line-soft)] pb-[14px] max-[700px]:items-start max-[700px]:flex-col max-[700px]:gap-2.5">
         <div className="flex min-w-0 items-baseline gap-[14px]">
           <h2 className="m-0 text-[1.42rem] tracking-[-0.03em]">{title}</h2>
-          <span className="whitespace-nowrap font-[var(--mono)] text-[0.78rem] text-[var(--slate-light)]">
-            {memberLabel(people.length)}
-          </span>
+          {memberLabel(people.length) ? (
+            <span className="whitespace-nowrap font-[var(--mono)] text-[0.78rem] text-[var(--slate-light)]">
+              {memberLabel(people.length)}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -48,43 +57,39 @@ export function PeopleSection({
           <PersonAvatar person={featuredPerson} className="!w-40" />
           <div>
             <h3 className="mb-2 text-[1.55rem]">
-              <PersonProfileDialog
-                person={featuredPerson}
-                className="m-0 cursor-pointer border-0 bg-transparent p-0 text-left font-inherit text-inherit hover:text-[var(--accent-deep)] hover:underline hover:underline-offset-3"
+              <Link
+                className="hover:text-[var(--accent-deep)] hover:underline hover:underline-offset-3"
+                href={personProfileHref(featuredPerson)}
               >
-                {featuredPerson.name}
-              </PersonProfileDialog>
+                {displayPersonName(featuredPerson)}
+              </Link>
             </h3>
             <p className="my-1 text-[var(--slate)]">
               <strong className="text-[var(--ink)]">
-                {featuredPerson.role}
-              </strong>{" "}
-              · {featuredPerson.group}
+                {displayPersonRole(featuredPerson)}
+              </strong>
             </p>
-            <p>{featuredPerson.bio}</p>
-            <ul className="mt-[18px] flex flex-wrap gap-1.5 m-0 list-none p-0">
-              {featuredPerson.research_interests.map((interest) => (
-                <li
-                  className="rounded-[4px] bg-[var(--bg-muted)] px-2 py-1 text-[0.76rem] text-[var(--slate)]"
-                  key={interest}
-                >
-                  {interest}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-[18px]">
+            <p className="max-w-[880px]">{personSummary(featuredPerson)}</p>
+            <div className="mt-[18px] flex flex-col items-start gap-2">
               {featuredPerson.email ? (
-                <a href={`mailto:${featuredPerson.email}`}>
+                <a
+                  className="inline-flex items-center gap-2 text-[var(--accent)] hover:text-[var(--accent-deep)]"
+                  href={`mailto:${featuredPerson.email}`}
+                >
+                  <Mail size={16} strokeWidth={1.8} aria-hidden="true" />
                   {featuredPerson.email}
                 </a>
               ) : null}
               {featuredPerson.website_url ? (
-                <>
-                  {featuredPerson.email ? " · " : null}
-                  <a href={featuredPerson.website_url}>Personal website</a>
-                </>
+                <Link
+                  className="inline-flex items-center gap-2 text-[var(--accent)] hover:text-[var(--accent-deep)]"
+                  href={personProfileHref(featuredPerson)}
+                >
+                  <Globe size={16} strokeWidth={1.8} aria-hidden="true" />
+                  Personal website
+                </Link>
               ) : null}
-            </p>
+            </div>
           </div>
         </article>
       ) : null}

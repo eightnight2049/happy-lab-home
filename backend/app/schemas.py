@@ -77,6 +77,9 @@ class PersonPayload(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     role: str = Field(min_length=1, max_length=120)
     group: str = "Students"
+    education_level: str | None = None
+    enrollment_year: int | None = Field(default=None, ge=1900, le=2100)
+    destination: str | None = Field(default=None, max_length=240)
     bio: str | None = None
     research_interests: list[str] = []
     email: str | None = None
@@ -91,6 +94,9 @@ class PersonOut(BaseModel):
     name: str
     role: str
     group: str
+    education_level: str | None
+    enrollment_year: int | None
+    destination: str | None
     bio: str | None
     research_interests: list[str]
     email: str | None

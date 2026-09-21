@@ -2,7 +2,7 @@
 
 import {
   CheckCircle2,
-  ClipboardCheck,
+  ChevronDown,
   FileText,
   Gauge,
   House,
@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Save,
+  Search,
   Settings,
   ShieldCheck,
   Trash2,
@@ -28,7 +29,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from "react";
+import { useRouter } from "next/navigation";
 import { fallbackSnapshot } from "@/lib/data";
 import { formatLongDate } from "@/lib/format-date";
 import type {
@@ -40,17 +43,27 @@ import type {
   SiteSnapshot,
   UserRole,
 } from "@/lib/types";
-import { PersonAvatar } from "@/components/site/people-grid";
+import {
+  PersonAvatar,
+  PersonProfileDialog,
+} from "@/components/site/people-grid";
+import {
+  displayEducationLevel,
+  displayPersonMajor,
+  displayPersonName,
+  displayPersonRole,
+  isStudentPerson,
+} from "@/lib/person";
 
 type AdminView =
   | "overview"
-  | "review"
   | "settings"
   | "news"
   | "publications"
   | "people"
   | "profile"
   | "users";
+type QuickAction = "news" | "publication" | "profile" | "account";
 type AdminNavItem = {
   key: AdminView;
   label: string;
@@ -58,6 +71,10 @@ type AdminNavItem = {
   hidden?: boolean;
   badge?: number;
 };
+
+function adminViewPath(view: AdminView) {
+  return view === "overview" ? "/studio" : `/studio/${view}`;
+}
 type Session = {
   token: string;
   user: { id: number; email: string; full_name: string; role: UserRole };
@@ -100,6 +117,7 @@ export function AdminDashboard({
   initialNewsId?: number;
   initialPublicationId?: number;
 }) {
+  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [isSessionLoaded, setSessionLoaded] = useState(false);
   const [view, setView] = useState<AdminView>(initialView);
@@ -107,6 +125,7 @@ export function AdminDashboard({
   const [isSnapshotLoaded, setSnapshotLoaded] = useState(false);
   const [snapshotError, setSnapshotError] = useState("");
   const [message, setMessage] = useState("");
+  const [quickAction, setQuickAction] = useState<QuickAction | null>(null);
 
   async function refreshSnapshot(token?: string) {
     setSnapshotLoaded(false);
@@ -184,43 +203,75 @@ export function AdminDashboard({
       "motion-lab-session",
       JSON.stringify(normalized),
     );
-    window.history.replaceState(null, "", "/studio");
+    router.replace(adminViewPath(view));
   }
 
-  function onLogout() {
+  const onLogout = useCallback(() => {
     setSession(null);
     setSnapshotLoaded(false);
     setSnapshotError("");
     window.localStorage.removeItem("motion-lab-session");
-  }
+  }, []);
 
   function navigateView(nextView: AdminView) {
     setView(nextView);
+    router.push(adminViewPath(nextView));
+  }
+
+  function handleReviewChange(
+    item: ReviewQueueItem,
+    action: "publish" | "delete",
+  ) {
+    setSnapshot((current) => {
+      if (item.content_type === "news")
+        return {
+          ...current,
+          news:
+            action === "delete"
+              ? current.news.filter((entry) => entry.id !== item.id)
+              : current.news.map((entry) =>
+                  entry.id === item.id
+                    ? { ...entry, is_published: true }
+                    : entry,
+                ),
+        };
+      if (item.content_type === "publication")
+        return {
+          ...current,
+          publications:
+            action === "delete"
+              ? current.publications.filter((entry) => entry.id !== item.id)
+              : current.publications.map((entry) =>
+                  entry.id === item.id
+                    ? {
+                        ...entry,
+                        is_published: true,
+                        status: "Published",
+                      }
+                    : entry,
+                ),
+        };
+      return {
+        ...current,
+        people:
+          action === "delete"
+            ? current.people.filter((entry) => entry.id !== item.id)
+            : current.people.map((entry) =>
+                entry.id === item.id
+                  ? { ...entry, is_visible: true }
+                  : entry,
+              ),
+      };
+    });
   }
 
   const canManageUsers = session?.user.role === "admin";
-  const canReviewContent = session?.user.role === "admin";
-  const pendingCount = isSnapshotLoaded
-    ? snapshot.news.filter((item) => item.is_published === false).length +
-      snapshot.publications.filter(
-        (item) => item.is_published === false || item.status === "Draft",
-      ).length +
-      snapshot.people.filter((person) => person.is_visible === false).length
-    : 0;
   const nav: AdminNavItem[] = [
     { key: "overview", label: "Overview", icon: Gauge },
-    {
-      key: "review",
-      label: "Review queue",
-      icon: ClipboardCheck,
-      hidden: !canReviewContent,
-      badge: pendingCount,
-    },
     { key: "settings", label: "Site settings", icon: Settings },
     { key: "news", label: "News", icon: Newspaper },
     { key: "publications", label: "Publications", icon: FileText },
     { key: "people", label: "People", icon: Users },
-    { key: "profile", label: "My profile", icon: UserRound },
     {
       key: "users",
       label: "Account",
@@ -287,7 +338,13 @@ export function AdminDashboard({
                   </div>
                 ) : null}
                 {view === "overview" ? (
-                  <Overview snapshot={snapshot} onNavigate={setView} />
+                  <Overview
+                    snapshot={snapshot}
+                    token={session.token}
+                    accountRole={session.user.role}
+                    onChanged={handleReviewChange}
+                    onQuickAction={setQuickAction}
+                  />
                 ) : null}
                 {view === "settings" ? (
                   <SettingsPanel
@@ -300,61 +357,6 @@ export function AdminDashboard({
                       );
                     }}
                     onError={setMessage}
-                  />
-                ) : null}
-                {view === "review" && canReviewContent ? (
-                  <ReviewQueuePanel
-                    token={session.token}
-                    accountRole={session.user.role}
-                    onChanged={(item, action) =>
-                      setSnapshot((current) => {
-                        if (item.content_type === "news")
-                          return {
-                            ...current,
-                            news:
-                              action === "delete"
-                                ? current.news.filter(
-                                    (entry) => entry.id !== item.id,
-                                  )
-                                : current.news.map((entry) =>
-                                    entry.id === item.id
-                                      ? { ...entry, is_published: true }
-                                      : entry,
-                                  ),
-                          };
-                        if (item.content_type === "publication")
-                          return {
-                            ...current,
-                            publications:
-                              action === "delete"
-                                ? current.publications.filter(
-                                    (entry) => entry.id !== item.id,
-                                  )
-                                : current.publications.map((entry) =>
-                                    entry.id === item.id
-                                      ? {
-                                          ...entry,
-                                          is_published: true,
-                                          status: "Published",
-                                        }
-                                      : entry,
-                                  ),
-                          };
-                        return {
-                          ...current,
-                          people:
-                            action === "delete"
-                              ? current.people.filter(
-                                  (entry) => entry.id !== item.id,
-                                )
-                              : current.people.map((entry) =>
-                                  entry.id === item.id
-                                    ? { ...entry, is_visible: true }
-                                    : entry,
-                                ),
-                        };
-                      })
-                    }
                   />
                 ) : null}
                 {view === "news" ? (
@@ -382,24 +384,14 @@ export function AdminDashboard({
                   />
                 ) : null}
                 {view === "people" ? (
-                  <>
-                    <PeoplePanel
-                      people={snapshot.people}
-                      token={session.token}
-                      accountRole={session.user.role}
-                      onChanged={(people) =>
-                        setSnapshot((current) => ({ ...current, people }))
-                      }
-                    />
-                    <PeopleCreatePanel
-                      people={snapshot.people}
-                      token={session.token}
-                      accountRole={session.user.role}
-                      onChanged={(people) =>
-                        setSnapshot((current) => ({ ...current, people }))
-                      }
-                    />
-                  </>
+                  <PeoplePanel
+                    people={snapshot.people}
+                    token={session.token}
+                    accountRole={session.user.role}
+                    onChanged={(people) =>
+                      setSnapshot((current) => ({ ...current, people }))
+                    }
+                  />
                 ) : null}
                 {view === "profile" ? (
                   <ProfilePanel
@@ -417,6 +409,7 @@ export function AdminDashboard({
                   <UsersPanel
                     token={session.token}
                     currentUserId={session.user.id}
+                    onUnauthorized={onLogout}
                   />
                 ) : null}
               </>
@@ -424,6 +417,67 @@ export function AdminDashboard({
           </div>
         </main>
       </div>
+      {quickAction === "news" ? (
+        <QuickActionDialog
+          title="Add news"
+          onClose={() => setQuickAction(null)}
+        >
+          <NewsEditor
+            item={null}
+            token={session.token}
+            accountRole={session.user.role}
+            onCancel={() => setQuickAction(null)}
+            onSaved={(saved) =>
+              setSnapshot((current) => ({
+                ...current,
+                news: [saved, ...current.news],
+              }))
+            }
+          />
+        </QuickActionDialog>
+      ) : null}
+      {quickAction === "publication" ? (
+        <QuickActionDialog
+          title="Add publication"
+          onClose={() => setQuickAction(null)}
+        >
+          <PublicationEditor
+            item={null}
+            token={session.token}
+            accountRole={session.user.role}
+            onCancel={() => setQuickAction(null)}
+            onSaved={(saved) =>
+              setSnapshot((current) => ({
+                ...current,
+                publications: [saved, ...current.publications],
+              }))
+            }
+          />
+        </QuickActionDialog>
+      ) : null}
+      {quickAction === "profile" ? (
+        <QuickActionDialog
+          title="Add profile"
+          onClose={() => setQuickAction(null)}
+        >
+          <PeopleCreatePanel
+            people={snapshot.people}
+            token={session.token}
+            accountRole={session.user.role}
+            onChanged={(people) =>
+              setSnapshot((current) => ({ ...current, people }))
+            }
+          />
+        </QuickActionDialog>
+      ) : null}
+      {quickAction === "account" ? (
+        <QuickActionDialog
+          title="Add user"
+          onClose={() => setQuickAction(null)}
+        >
+          <UserCreatePanel token={session.token} />
+        </QuickActionDialog>
+      ) : null}
     </div>
   );
 }
@@ -685,10 +739,16 @@ function LoginCard({
 
 function Overview({
   snapshot,
-  onNavigate,
+  token,
+  accountRole,
+  onChanged,
+  onQuickAction,
 }: {
   snapshot: SiteSnapshot;
-  onNavigate: (view: AdminView) => void;
+  token: string;
+  accountRole: UserRole;
+  onChanged: (item: ReviewQueueItem, action: "publish" | "delete") => void;
+  onQuickAction: (action: QuickAction) => void;
 }) {
   const publishedNewsCount = snapshot.news.filter(
     (item) => item.is_published !== false,
@@ -716,72 +776,90 @@ function Overview({
         ))}
       </div>
       <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
-          <div>
-            <h2>Quick actions</h2>
-            <p>Common updates for the public homepage.</p>
-          </div>
+        <div className="mb-[18px] [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
+          <h2>Quick actions</h2>
+          <p>Add content and workspace records from one place.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
             type="button"
-            onClick={() => onNavigate("settings")}
+            onClick={() => onQuickAction("news")}
           >
-            <Settings size={15} /> Edit site intro
+            <Newspaper size={15} /> Add news
           </button>
           <button
             className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
             type="button"
-            onClick={() => onNavigate("news")}
-          >
-            <Newspaper size={15} /> Publish news
-          </button>
-          <button
-            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-            type="button"
-            onClick={() => onNavigate("publications")}
+            onClick={() => onQuickAction("publication")}
           >
             <Upload size={15} /> Add publication
           </button>
+          {accountRole === "admin" ? (
+            <>
+              <button
+                className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                type="button"
+                onClick={() => onQuickAction("profile")}
+              >
+                <UserRound size={15} /> Add profile
+              </button>
+              <button
+                className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                type="button"
+                onClick={() => onQuickAction("account")}
+              >
+                <Users size={15} /> Add user
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
-      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
-          <div>
-            <h2>Recent news</h2>
-            <p>Published items and submissions awaiting review.</p>
-          </div>
+      {accountRole === "admin" ? (
+        <ReviewQueuePanel token={token} onChanged={onChanged} />
+      ) : null}
+    </>
+  );
+}
+
+function QuickActionDialog({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="max-h-[min(90vh,900px)] w-full max-w-[1100px] overflow-y-auto rounded-[14px] border border-[#e0e0dc] bg-white p-5 shadow-[0_20px_70px_-24px_rgba(0,0,0,0.45)]"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="m-0 text-[1.15rem]">{title}</h2>
           <button
-            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+            className="inline-flex min-h-[38px] min-w-[38px] items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--slate)] hover:border-[var(--ink)] hover:text-[var(--ink)]"
             type="button"
-            onClick={() => onNavigate("news")}
+            aria-label={`Close ${title}`}
+            onClick={onClose}
           >
-            Manage all
+            <X size={17} />
           </button>
         </div>
-        <div className="grid gap-[9px]">
-          {snapshot.news.slice(0, 3).map((item) => (
-            <div
-              className="flex items-center justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:items-start max-[720px]:flex-col"
-              key={item.id}
-            >
-              <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
-                <strong>{item.title}</strong>
-                <span>
-                  {formatLongDate(item.date)} · {item.tag ?? "Update"}
-                </span>
-              </div>
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${item.is_published === false ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
-              >
-                {item.is_published === false ? "Pending review" : "Published"}
-              </span>
-            </div>
-          ))}
-        </div>
+        {children}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -901,6 +979,7 @@ function Field({
   onChange,
   full = false,
   textarea = false,
+  compact = false,
   disabled = false,
   type = "text",
   hint,
@@ -910,14 +989,15 @@ function Field({
   onChange: (value: string) => void;
   full?: boolean;
   textarea?: boolean;
+  compact?: boolean;
   disabled?: boolean;
-  type?: "text" | "date";
+  type?: "text" | "date" | "number";
   hint?: string;
 }) {
   const fieldId = `admin-field-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
     <div
-      className={`grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)] ${full ? "col-span-full max-[700px]:col-auto" : ""}`}
+      className={`grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)] ${compact ? "[&_textarea]:h-[50px] [&_textarea]:min-h-0 [&_textarea]:resize-none" : "[&_textarea]:min-h-[110px]"} ${full ? "col-span-full max-[700px]:col-auto" : ""}`}
     >
       <label htmlFor={fieldId}>{label}</label>
       {hint ? (
@@ -945,6 +1025,47 @@ function Field({
   );
 }
 
+function FileField({
+  id,
+  label,
+  file,
+  existingUrl,
+  accept,
+  onChange,
+  inputRef,
+  large = false,
+}: {
+  id: string;
+  label: string;
+  file: File | null;
+  existingUrl?: string | null;
+  accept: string;
+  onChange: (file: File | null) => void;
+  inputRef?: RefObject<HTMLInputElement | null>;
+  large?: boolean;
+}) {
+  const displayName = file?.name ?? (existingUrl ? "Uploaded file" : "Choose file");
+  return (
+    <div className="grid h-full min-w-0 gap-1.5 [&_label:first-child]:text-[0.78rem] [&_label:first-child]:font-semibold [&_label:first-child]:text-[var(--slate)]">
+      <label htmlFor={id}>{label}</label>
+      <label
+        className={`flex w-full min-w-0 cursor-pointer items-center rounded-[7px] border border-[#d8d8d2] bg-white px-[11px] py-2.5 text-[var(--ink)] hover:border-[var(--accent)] ${large ? "min-h-[110px]" : "h-[50px] min-h-0"}`}
+        htmlFor={id}
+      >
+        <span className="min-w-0 truncate">{displayName}</span>
+      </label>
+      <input
+        ref={inputRef}
+        id={id}
+        className="sr-only"
+        type="file"
+        accept={accept}
+        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+      />
+    </div>
+  );
+}
+
 function NewsPanel({
   items,
   token,
@@ -963,9 +1084,41 @@ function NewsPanel({
   const [editingId, setEditingId] = useState<number | null>(
     initialEditId ?? null,
   );
+  const [query, setQuery] = useState("");
+  const [yearFilter, setYearFilter] = useState("all");
   const editingItem = editingId
     ? (items.find((item) => item.id === editingId) ?? null)
     : null;
+  const years = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items
+            .map((item) => Number(item.date.slice(0, 4)))
+            .filter((year) => Number.isInteger(year)),
+        ),
+      ).sort((left, right) => right - left),
+    [items],
+  );
+  const filteredItems = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return items.filter((item) => {
+      const haystack = [
+        item.title,
+        item.body,
+        item.tag,
+        item.href,
+        item.date,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return (
+        (yearFilter === "all" || item.date.slice(0, 4) === yearFilter) &&
+        (!needle || haystack.includes(needle))
+      );
+    });
+  }, [items, query, yearFilter]);
   const canEdit = (item: NewsItem) =>
     accountRole === "admin" ||
     (item.is_published === false && item.created_by_id === currentUserId);
@@ -984,39 +1137,73 @@ function NewsPanel({
 
   return (
     <>
-      <NewsEditor
-        key={`news-editor-${editingItem?.id ?? "new"}`}
-        item={editingItem}
-        token={token}
-        accountRole={accountRole}
-        onCancel={() => setEditingId(null)}
-        onSaved={(saved) =>
-          onChanged(
-            editingItem
-              ? items.map((item) => (item.id === saved.id ? saved : item))
-              : [saved, ...items],
-          )
-        }
-      />
+      {editingItem ? (
+        <NewsEditor
+          key={`news-editor-${editingItem.id}`}
+          item={editingItem}
+          token={token}
+          accountRole={accountRole}
+          onCancel={() => setEditingId(null)}
+          onSaved={(saved) =>
+            onChanged(
+              items.map((item) => (item.id === saved.id ? saved : item)),
+            )
+          }
+        />
+      ) : null}
       <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
         <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>News library</h2>
             <p>
               Edit published items or review your own pending submission. Final
-              approval is handled in Review queue.
+              approval is handled on Overview.
             </p>
           </div>
-          <button
-            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-            type="button"
-            onClick={() => setEditingId(null)}
-          >
-            <Plus size={15} /> New news
-          </button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label className="relative min-w-[200px] flex-[1_1_260px]">
+            <span className="sr-only">Search news</span>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--slate)]"
+              size={17}
+              aria-hidden="true"
+            />
+            <input
+              className="w-full rounded-[7px] border border-[#d8d8d2] bg-white px-3 py-[11px] pl-10 text-[0.9rem] text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
+              id="admin-news-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by title, content, or tag…"
+            />
+          </label>
+          <label className="sr-only" htmlFor="admin-news-year-filter">
+            Filter news by year
+          </label>
+          <div className="relative inline-block">
+            <select
+              className="min-h-[42px] appearance-none rounded-full border border-[var(--line)] bg-white px-9 py-[7px] text-center text-[0.9rem] text-[var(--slate)] outline-none focus:border-[var(--ink)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+              id="admin-news-year-filter"
+              value={yearFilter}
+              onChange={(event) => setYearFilter(event.target.value)}
+            >
+              <option value="all">All years</option>
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--slate)]"
+              size={14}
+              aria-hidden="true"
+            />
+          </div>
         </div>
         <div className="grid gap-[9px]">
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <div
               className="flex items-center justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:items-start max-[720px]:flex-col"
               key={item.id}
@@ -1054,6 +1241,11 @@ function NewsPanel({
               </div>
             </div>
           ))}
+          {!filteredItems.length ? (
+            <p className="py-5 text-[0.84rem] text-[var(--slate)]">
+              No news matches your search.
+            </p>
+          ) : null}
         </div>
       </div>
     </>
@@ -1142,32 +1334,21 @@ function NewsEditor({
 
   return (
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
-        <div>
-          <h2>
-            {item
-              ? "Edit news"
-              : isContributor
-                ? "Submit a news item"
-                : "Publish a news item"}
-          </h2>
-          <p>
-            {isContributor
-              ? "Your submission stays pending until an admin approves it."
-              : item
-                ? "Changes are written to the public site immediately when this item is already published."
-                : "Published items appear on the public homepage immediately."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
-          {item ? (
+      {item ? (
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
+          <div>
+            <h2>Edit news</h2>
+            <p>
+              Changes are written to the public site immediately when this item
+              is already published.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
             <span
               className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${item.is_published === false ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
             >
               {item.is_published === false ? "Pending review" : "Published"}
             </span>
-          ) : null}
-          {item ? (
             <button
               className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
               type="button"
@@ -1175,9 +1356,9 @@ function NewsEditor({
             >
               <X size={15} /> Cancel
             </button>
-          ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
       <form
         className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
         onSubmit={submit}
@@ -1240,9 +1421,40 @@ function PublicationsPanel({
   const [editingId, setEditingId] = useState<number | null>(
     initialEditId ?? null,
   );
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [yearFilter, setYearFilter] = useState("All");
   const editingItem = editingId
     ? (items.find((item) => item.id === editingId) ?? null)
     : null;
+  const years = useMemo(
+    () =>
+      Array.from(new Set(items.map((item) => item.year))).sort(
+        (left, right) => right - left,
+      ),
+    [items],
+  );
+  const filteredItems = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return items.filter((item) =>
+      (typeFilter === "All" || item.type === typeFilter) &&
+      (yearFilter === "All" || item.year === Number(yearFilter)) &&
+      (!needle ||
+        [
+          item.title,
+          item.authors,
+          item.venue,
+          item.venue_short,
+          item.abstract,
+          item.year.toString(),
+          item.type,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(needle)),
+    );
+  }, [items, query, typeFilter, yearFilter]);
   const canEdit = (item: Publication) =>
     accountRole === "admin" ||
     (item.is_published === false && item.created_by_id === currentUserId);
@@ -1261,39 +1473,88 @@ function PublicationsPanel({
 
   return (
     <>
-      <PublicationEditor
-        key={`publication-editor-${editingItem?.id ?? "new"}`}
-        item={editingItem}
-        token={token}
-        accountRole={accountRole}
-        onCancel={() => setEditingId(null)}
-        onSaved={(saved) =>
-          onChanged(
-            editingItem
-              ? items.map((item) => (item.id === saved.id ? saved : item))
-              : [saved, ...items],
-          )
-        }
-      />
+      {editingItem ? (
+        <PublicationEditor
+          key={`publication-editor-${editingItem.id}`}
+          item={editingItem}
+          token={token}
+          accountRole={accountRole}
+          onCancel={() => setEditingId(null)}
+          onSaved={(saved) =>
+            onChanged(
+              items.map((item) => (item.id === saved.id ? saved : item)),
+            )
+          }
+        />
+      ) : null}
       <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
         <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Publication library</h2>
             <p>
               Edit published papers or review your own pending submission. Final
-              approval is handled in Review queue.
+              approval is handled on Overview.
             </p>
           </div>
-          <button
-            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-            type="button"
-            onClick={() => setEditingId(null)}
-          >
-            <Plus size={15} /> New publication
-          </button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label className="relative min-w-[200px] flex-[1_1_260px]">
+            <span className="sr-only">Search publications</span>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--slate)]"
+              size={17}
+              aria-hidden="true"
+            />
+            <input
+              className="w-full rounded-[7px] border border-[#d8d8d2] bg-white px-3 py-[11px] pl-10 text-[0.9rem] text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
+              id="admin-publication-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by title, author, venue, or abstract…"
+            />
+          </label>
+          <label className="sr-only" htmlFor="admin-publication-year-filter">
+            Filter publications by year
+          </label>
+          <div className="relative inline-block">
+            <select
+              className="min-h-[42px] appearance-none rounded-full border border-[var(--line)] bg-white px-9 py-[7px] text-center text-[0.9rem] text-[var(--slate)] outline-none focus:border-[var(--ink)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+              id="admin-publication-year-filter"
+              value={yearFilter}
+              onChange={(event) => setYearFilter(event.target.value)}
+            >
+              <option value="All">All years</option>
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--slate)]"
+              size={14}
+              aria-hidden="true"
+            />
+          </div>
+          {[
+            ["All", "All"],
+            ["Conference", "Conference"],
+            ["Journal", "Journal"],
+            ["Preprint", "Preprint"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              className={`rounded-full border px-[13px] py-[7px] text-[0.9rem] transition-colors ${typeFilter === value ? "border-[var(--ink)] bg-[var(--ink)] text-white" : "border-[var(--line)] bg-white text-[var(--slate)] hover:border-[var(--ink)] hover:bg-[var(--ink)] hover:text-white"}`}
+              type="button"
+              onClick={() => setTypeFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         <div className="grid gap-[9px]">
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <div
               className="flex items-center justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:items-start max-[720px]:flex-col"
               key={item.id}
@@ -1331,6 +1592,11 @@ function PublicationsPanel({
               </div>
             </div>
           ))}
+          {!filteredItems.length ? (
+            <p className="py-5 text-[0.84rem] text-[var(--slate)]">
+              No publications match your search.
+            </p>
+          ) : null}
         </div>
       </div>
     </>
@@ -1360,11 +1626,14 @@ function PublicationEditor({
   );
   const [type, setType] = useState(item?.type ?? "Preprint");
   const [abstract, setAbstract] = useState(item?.abstract ?? "");
-  const [paperUrl, setPaperUrl] = useState(item?.paper_url ?? "");
+  const [homepageUrl, setHomepageUrl] = useState(item?.paper_url ?? "");
+  const [paperUrl, setPaperUrl] = useState(item?.pdf_url ?? "");
   const [codeUrl, setCodeUrl] = useState(item?.code_url ?? "");
   const [videoUrl, setVideoUrl] = useState(item?.video_url ?? "");
-  const [file, setFile] = useState<File | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [savedThumbnailUrl, setSavedThumbnailUrl] = useState(
+    item?.thumbnail_url ?? null,
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -1396,9 +1665,8 @@ function PublicationEditor({
     setSaving(true);
     setMessage("");
     try {
-      const pdfUrl = (await upload(file)) ?? item?.pdf_url ?? null;
       const thumbnailUrl =
-        (await upload(thumbnail)) ?? item?.thumbnail_url ?? null;
+        (await upload(thumbnail)) ?? savedThumbnailUrl ?? null;
       const payload = {
         title: title.trim(),
         authors: authors.trim(),
@@ -1408,8 +1676,8 @@ function PublicationEditor({
         type,
         status: item?.status ?? "Pending review",
         abstract: abstract.trim() || null,
-        paper_url: paperUrl.trim() || null,
-        pdf_url: pdfUrl,
+        paper_url: homepageUrl.trim() || null,
+        pdf_url: paperUrl.trim() || null,
         code_url: codeUrl.trim() || null,
         video_url: videoUrl.trim() || null,
         thumbnail_url: thumbnailUrl,
@@ -1434,6 +1702,7 @@ function PublicationEditor({
         throw new Error(detail?.detail ?? "Could not save the publication.");
       }
       onSaved((await response.json()) as Publication);
+      setSavedThumbnailUrl(thumbnailUrl);
       if (!item) {
         setTitle("");
         setAuthors("");
@@ -1442,10 +1711,10 @@ function PublicationEditor({
         setYear(String(new Date().getFullYear()));
         setType("Preprint");
         setAbstract("");
+        setHomepageUrl("");
         setPaperUrl("");
         setCodeUrl("");
         setVideoUrl("");
-        setFile(null);
         setThumbnail(null);
       }
       setMessage(
@@ -1468,19 +1737,16 @@ function PublicationEditor({
 
   return (
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
-        <div>
-          <h2>{item ? "Edit publication" : "Add a publication"}</h2>
-          <p>
-            {isContributor
-              ? "Your submission stays pending until an admin approves it."
-              : item
-                ? "All paper metadata, links, files, and thumbnails can be changed here."
-                : "New entries are submitted for review so an admin can verify the metadata, files, and links."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
-          {item ? (
+      {item ? (
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
+          <div>
+            <h2>Edit publication</h2>
+            <p>
+              All paper metadata, links, files, and thumbnails can be changed
+              here.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
             <span
               className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${item.is_published === false || item.status === "Draft" ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
             >
@@ -1488,12 +1754,6 @@ function PublicationEditor({
                 ? "Pending review"
                 : "Published"}
             </span>
-          ) : (
-            <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
-              Pending review
-            </span>
-          )}
-          {item ? (
             <button
               className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
               type="button"
@@ -1501,9 +1761,9 @@ function PublicationEditor({
             >
               <X size={15} /> Cancel
             </button>
-          ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
       <form
         className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
         onSubmit={submit}
@@ -1552,36 +1812,23 @@ function PublicationEditor({
           textarea
           onChange={setAbstract}
         />
-        <Field label="Homepage link" value={paperUrl} onChange={setPaperUrl} />
+        <Field
+          label="Homepage link"
+          value={homepageUrl}
+          onChange={setHomepageUrl}
+        />
         <Field label="Code link" value={codeUrl} onChange={setCodeUrl} />
         <Field label="Video link" value={videoUrl} onChange={setVideoUrl} />
-        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
-          <label htmlFor="publication-file">Paper file (PDF)</label>
-          <input
-            id="publication-file"
-            type="file"
-            accept="application/pdf"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-          />
-          {item?.pdf_url ? (
-            <small className="text-[var(--slate)]">
-              Current: {item.pdf_url}
-            </small>
-          ) : null}
-        </div>
-        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
-          <label htmlFor="publication-thumbnail">Thumbnail</label>
-          <input
+        <Field label="Paper link" value={paperUrl} onChange={setPaperUrl} />
+        <div className="col-start-2 row-start-4 max-[700px]:col-auto max-[700px]:row-auto">
+          <FileField
             id="publication-thumbnail"
-            type="file"
+            label="Thumbnail"
+            file={thumbnail}
+            existingUrl={savedThumbnailUrl}
             accept="image/png,image/jpeg,image/webp"
-            onChange={(event) => setThumbnail(event.target.files?.[0] ?? null)}
+            onChange={setThumbnail}
           />
-          {item?.thumbnail_url ? (
-            <small className="text-[var(--slate)]">
-              Current: {item.thumbnail_url}
-            </small>
-          ) : null}
         </div>
         <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
           <button
@@ -1609,11 +1856,9 @@ function PublicationEditor({
 
 function ReviewQueuePanel({
   token,
-  accountRole,
   onChanged,
 }: {
   token: string;
-  accountRole: UserRole;
   onChanged: (item: ReviewQueueItem, action: "publish" | "delete") => void;
 }) {
   const [items, setItems] = useState<ReviewQueueItem[]>([]);
@@ -1630,12 +1875,8 @@ function ReviewQueuePanel({
       });
       if (!response.ok) throw new Error("Could not load the review queue.");
       setItems((await response.json()) as ReviewQueueItem[]);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not load the review queue.",
-      );
+    } catch {
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -1727,14 +1968,8 @@ function ReviewQueuePanel({
   } as const;
   return (
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
-        <div>
-          <h2>Unified review queue</h2>
-          <p>
-            All submissions waiting to appear on the public site are handled
-            here. Edit first when details need correction, then publish.
-          </p>
-        </div>
+      <div className="mb-[14px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem]">
+        <h2>Review queue</h2>
         <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
           {items.length} pending
         </span>
@@ -1748,19 +1983,14 @@ function ReviewQueuePanel({
         <p className="text-[var(--slate)]">Loading submissions…</p>
       ) : null}
       {!loading && !items.length ? (
-        <div className="flex items-start gap-3 px-0 py-[18px] pb-1 text-[#31733d]">
-          <CheckCircle2 size={20} />
-          <div>
-            <strong>Nothing is waiting for review.</strong>
-            <p>New user submissions will appear here automatically.</p>
-          </div>
+        <div className="flex items-center gap-2 py-3 text-[0.9rem] text-[#31733d]">
+          <CheckCircle2 size={18} />
+          <span>No pending submissions.</span>
         </div>
       ) : null}
       <div className="grid gap-[9px]">
         {items.map((item) => {
           const key = `${item.content_type}-${item.id}`;
-          const canDelete =
-            accountRole === "admin" || item.content_type !== "person";
           return (
             <div
               className="flex items-start justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:flex-col"
@@ -1774,33 +2004,28 @@ function ReviewQueuePanel({
                 <span>{item.summary}</span>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
-                <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
-                  Pending review
-                </span>
-                <Link
-                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-                  href={editHref(item)}
-                >
-                  <Pencil size={14} /> Edit
-                </Link>
                 <button
                   className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
                   type="button"
                   disabled={workingKey === key}
                   onClick={() => void publish(item)}
                 >
-                  {workingKey === key ? "Working…" : "Publish"}
+                  {workingKey === key ? "Working…" : "Approve"}
                 </button>
-                {canDelete ? (
-                  <button
-                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
-                    type="button"
-                    disabled={workingKey === key}
-                    onClick={() => void remove(item)}
-                  >
-                    <Trash2 size={14} /> Remove
-                  </button>
-                ) : null}
+                <button
+                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
+                  type="button"
+                  disabled={workingKey === key}
+                  onClick={() => void remove(item)}
+                >
+                  <Trash2 size={14} /> Reject
+                </button>
+                <Link
+                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                  href={editHref(item)}
+                >
+                  <Pencil size={14} /> Edit
+                </Link>
               </div>
             </div>
           );
@@ -1815,12 +2040,12 @@ const peopleDirectoryCategories = [
   { key: "phd", title: "PhD students" },
   { key: "masters", title: "Master's students" },
   { key: "undergraduate", title: "Undergraduate students" },
-  { key: "alumni", title: "Alumni" },
   { key: "research", title: "Research staff" },
-  { key: "other", title: "Other lab members" },
 ] as const;
 type PeopleDirectoryCategory =
-  (typeof peopleDirectoryCategories)[number]["key"];
+  | (typeof peopleDirectoryCategories)[number]["key"]
+  | "alumni"
+  | "other";
 
 function adminPeopleCategoryFor(person: Person): PeopleDirectoryCategory {
   const value = `${person.group} ${person.role}`.toLowerCase();
@@ -1861,16 +2086,15 @@ function PeoplePanel({
   onChanged: (people: Person[]) => void;
 }) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(
+    null,
+  );
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
+  const [educationFilter, setEducationFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState("all");
 
   async function deletePerson(person: Person) {
-    if (
-      !window.confirm(
-        `Delete ${person.name}'s People profile? The linked account will not be deleted.`,
-      )
-    )
-      return;
     setDeletingId(person.id);
     setMessage("");
     try {
@@ -1896,27 +2120,50 @@ function PeoplePanel({
       );
     } finally {
       setDeletingId(null);
+      setConfirmingDeleteId(null);
     }
   }
 
+  const entryYears = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          people
+            .map((person) => person.enrollment_year)
+            .filter((year): year is number => Boolean(year)),
+        ),
+      ).sort((left, right) => right - left),
+    [people],
+  );
+
   const filteredPeople = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return people;
     return people.filter((person) =>
-      [
-        person.name,
-        person.role,
-        person.group,
-        person.email,
-        person.account_email,
-        person.research_interests.join(" "),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
+      (educationFilter === "all" ||
+        (adminPeopleCategoryFor(person) !== "faculty" &&
+          adminPeopleCategoryFor(person) !== "research" &&
+          adminPeopleCategoryFor(person) !== "other" &&
+          displayEducationLevel(person) === educationFilter)) &&
+        (yearFilter === "all" ||
+          person.enrollment_year?.toString() === yearFilter) &&
+        (!needle ||
+          [
+            person.name,
+            person.role,
+            person.group,
+            person.email,
+            person.account_email,
+            person.education_level,
+            person.enrollment_year?.toString(),
+            person.destination,
+            person.research_interests.join(" "),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .includes(needle)),
     );
-  }, [people, query]);
+  }, [educationFilter, people, query, yearFilter]);
   const grouped = useMemo(
     () =>
       new Map(
@@ -1929,7 +2176,13 @@ function PeoplePanel({
       ),
     [filteredPeople],
   );
-  const hasQuery = query.trim().length > 0;
+  const hasQuery =
+    query.trim().length > 0 ||
+    educationFilter !== "all" ||
+    yearFilter !== "all";
+  const alumni = filteredPeople.filter(
+    (person) => adminPeopleCategoryFor(person) === "alumni",
+  );
   const visibleCategories = peopleDirectoryCategories.filter(
     (category) => !hasQuery || (grouped.get(category.key)?.length ?? 0) > 0,
   );
@@ -1952,20 +2205,54 @@ function PeoplePanel({
           {filteredPeople.length === 1 ? "member" : "members"}
         </span>
       </div>
-      <label className="mb-[22px] grid gap-1.5">
-        <span className="text-[0.78rem] font-semibold text-[var(--slate)]">
-          Search people
-        </span>
-        <input
-          className="w-full rounded-[7px] border border-[#d8d8d2] bg-white px-3 py-[11px] text-[0.9rem] text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by name, role, group, or email…"
-        />
-      </label>
-      {visibleCategories.length ? (
-        visibleCategories.map((category) => {
+      <div className="mb-[22px] grid grid-cols-[minmax(0,1fr)_180px_150px] items-end gap-3 max-[700px]:grid-cols-1">
+        <label className="grid gap-1.5">
+          <span className="text-[0.78rem] font-semibold text-[var(--slate)]">
+            Search people
+          </span>
+          <input
+            className="w-full rounded-[7px] border border-[#d8d8d2] bg-white px-3 py-[11px] text-[0.9rem] text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by name, role, group, or email…"
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[0.78rem] font-semibold text-[var(--slate)]">
+            Education
+          </span>
+          <select
+            className="w-full rounded-[7px] border border-[#d8d8d2] bg-white px-3 py-[11px] text-[0.9rem] text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
+            value={educationFilter}
+            onChange={(event) => setEducationFilter(event.target.value)}
+          >
+            <option value="all">All education levels</option>
+            <option value="PhD">PhD</option>
+            <option value="Master's">Master&apos;s</option>
+            <option value="Undergraduate">Undergraduate</option>
+          </select>
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-[0.78rem] font-semibold text-[var(--slate)]">
+            Entry year
+          </span>
+          <select
+            className="w-full rounded-[7px] border border-[#d8d8d2] bg-white px-3 py-[11px] text-[0.9rem] text-[var(--ink)] outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]"
+            value={yearFilter}
+            onChange={(event) => setYearFilter(event.target.value)}
+          >
+            <option value="all">All years</option>
+            {entryYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {visibleCategories.length
+        ? visibleCategories.map((category) => {
           const members = grouped.get(category.key) ?? [];
           return (
             <section
@@ -1992,19 +2279,13 @@ function PeoplePanel({
                         />
                         <div className="min-w-0">
                           <div className="flex items-start justify-start gap-2 pr-7">
-                            <strong className="min-w-0 [overflow-wrap:anywhere] text-[0.92rem] leading-[1.25]">
-                              {person.name}
-                            </strong>
+                            <PersonProfileDialog
+                              person={person}
+                              className="m-0 min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left text-[0.92rem] font-semibold leading-[1.25] text-[var(--ink)] [overflow-wrap:anywhere] hover:text-[var(--accent-deep)] hover:underline hover:underline-offset-3"
+                            >
+                              {displayPersonName(person)}
+                            </PersonProfileDialog>
                             <span className="absolute top-3 right-3 inline-flex items-center gap-[5px]">
-                              {person.account_role === "admin" ? (
-                                <span
-                                  className="inline-flex size-[25px] items-center justify-center rounded-[7px] border border-[#cda7a7] bg-[#fbeaea] text-[var(--accent-deep)]"
-                                  title="Admin"
-                                  aria-label="Admin"
-                                >
-                                  <ShieldCheck size={16} />
-                                </span>
-                              ) : null}
                               {person.is_visible === false ? (
                                 <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
                                   Pending
@@ -2013,10 +2294,9 @@ function PeoplePanel({
                             </span>
                           </div>
                           <p className="mt-1 m-0 text-[0.78rem] leading-[1.35] text-[var(--slate)]">
-                            {person.role}
-                          </p>
-                          <p className="mt-0.5 m-0 text-[0.72rem] italic leading-[1.35] text-[var(--slate-light)]">
-                            {person.group}
+                            {isStudentPerson(person)
+                              ? displayPersonMajor(person)
+                              : displayPersonRole(person)}
                           </p>
                         </div>
                       </div>
@@ -2030,15 +2310,37 @@ function PeoplePanel({
                           </Link>
                         ) : null}
                         {accountRole === "admin" ? (
-                          <button
-                            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
-                            type="button"
-                            disabled={deletingId === person.id}
-                            onClick={() => void deletePerson(person)}
-                          >
-                            <Trash2 size={13} />
-                            {deletingId === person.id ? "Deleting…" : "Delete"}
-                          </button>
+                          confirmingDeleteId === person.id ? (
+                            <>
+                              <button
+                                className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white"
+                                type="button"
+                                disabled={deletingId === person.id}
+                                onClick={() => void deletePerson(person)}
+                              >
+                                <Trash2 size={13} />
+                                {deletingId === person.id
+                                  ? "Deleting…"
+                                  : "Confirm delete"}
+                              </button>
+                              <button
+                                className="inline-flex min-h-[42px] items-center justify-center rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)]"
+                                type="button"
+                                disabled={deletingId === person.id}
+                                onClick={() => setConfirmingDeleteId(null)}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
+                              type="button"
+                              onClick={() => setConfirmingDeleteId(person.id)}
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )
                         ) : null}
                       </div>
                     </article>
@@ -2053,11 +2355,23 @@ function PeoplePanel({
             </section>
           );
         })
-      ) : (
+        : null}
+      {alumni.length ? (
+        <AdminAlumniSection
+          people={alumni}
+          accountRole={accountRole}
+          deletingId={deletingId}
+          confirmingDeleteId={confirmingDeleteId}
+          onDelete={deletePerson}
+          onRequestDelete={(person) => setConfirmingDeleteId(person.id)}
+          onCancelDelete={() => setConfirmingDeleteId(null)}
+        />
+      ) : null}
+      {!visibleCategories.length && !alumni.length ? (
         <div className="px-0 py-5 pb-1 text-[0.84rem] text-[var(--slate-light)]">
-          No people match “{query.trim()}”.
+          No people match the current search or filters.
         </div>
-      )}
+      ) : null}
       {message ? (
         <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
           {message}
@@ -2067,10 +2381,149 @@ function PeoplePanel({
   );
 }
 
+const alumniEducationLevels = ["PhD", "Master's", "Undergraduate"] as const;
+
+function AdminAlumniSection({
+  people,
+  accountRole,
+  deletingId,
+  confirmingDeleteId,
+  onDelete,
+  onRequestDelete,
+  onCancelDelete,
+}: {
+  people: Person[];
+  accountRole: UserRole;
+  deletingId: number | null;
+  confirmingDeleteId: number | null;
+  onDelete: (person: Person) => void | Promise<void>;
+  onRequestDelete: (person: Person) => void;
+  onCancelDelete: () => void;
+}) {
+  const isAdmin = accountRole === "admin";
+  const columns = isAdmin
+    ? "grid-cols-[1.2fr_0.85fr_0.7fr_1.55fr_170px]"
+    : "grid-cols-[1.2fr_0.85fr_0.7fr_1.55fr]";
+
+  return (
+    <section className="mt-6 border-t border-[var(--line)] pt-[18px]">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h3 className="m-0 text-[0.94rem]">Alumni</h3>
+        <span className="font-[var(--mono)] text-[0.68rem] text-[var(--slate-light)]">
+          {people.length} {people.length === 1 ? "member" : "members"}
+        </span>
+      </div>
+      <div className="grid gap-5">
+        {alumniEducationLevels.map((level) => {
+          const members = people.filter(
+            (person) => displayEducationLevel(person) === level,
+          );
+          if (!members.length) return null;
+          return (
+            <div key={level}>
+              <h4 className="mb-2 text-[0.84rem] font-semibold text-[var(--slate)]">
+                {level}
+              </h4>
+              <div className="overflow-x-auto rounded-[8px] border border-[var(--line-soft)]">
+                <div
+                  className={`hidden min-w-[760px] ${columns} gap-3 border-b border-[var(--line-soft)] bg-[var(--bg-muted)] px-3 py-2 font-[var(--mono)] text-[0.66rem] uppercase tracking-[0.08em] text-[var(--slate-light)] min-[701px]:grid`}
+                >
+                  <span>Name</span>
+                  <span>Degree</span>
+                  <span>Entry year</span>
+                  <span>Destination</span>
+                  {isAdmin ? <span>Actions</span> : null}
+                </div>
+                <ul className="m-0 min-w-[760px] list-none divide-y divide-[var(--line-soft)] p-0 max-[700px]:min-w-0">
+                  {members.map((person) => (
+                    <li
+                      className={`grid ${columns} items-center gap-3 px-3 py-3 text-[0.82rem] max-[700px]:grid-cols-2 max-[700px]:gap-x-4 max-[700px]:gap-y-2`}
+                      key={person.id}
+                    >
+                      <PersonProfileDialog
+                        person={person}
+                        className="m-0 min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left font-semibold text-[var(--ink)] hover:text-[var(--accent-deep)] hover:underline hover:underline-offset-3 max-[700px]:col-span-2"
+                      >
+                        {displayPersonName(person)}
+                      </PersonProfileDialog>
+                      <span className="max-[700px]:flex max-[700px]:flex-col">
+                        <span className="hidden font-[var(--mono)] text-[0.64rem] uppercase tracking-[0.08em] text-[var(--slate-light)] max-[700px]:block">
+                          Degree
+                        </span>
+                        {displayEducationLevel(person)}
+                      </span>
+                      <span className="max-[700px]:flex max-[700px]:flex-col">
+                        <span className="hidden font-[var(--mono)] text-[0.64rem] uppercase tracking-[0.08em] text-[var(--slate-light)] max-[700px]:block">
+                          Entry year
+                        </span>
+                        {person.enrollment_year ?? "—"}
+                      </span>
+                      <span className="min-w-0 truncate text-[var(--slate)] max-[700px]:col-span-2 max-[700px]:flex max-[700px]:flex-col">
+                        <span className="hidden font-[var(--mono)] text-[0.64rem] uppercase tracking-[0.08em] text-[var(--slate-light)] max-[700px]:block">
+                          Destination
+                        </span>
+                        {person.destination || "—"}
+                      </span>
+                      {isAdmin ? (
+                        <span className="flex flex-wrap gap-1.5 max-[700px]:col-span-2">
+                          <Link
+                            className="inline-flex min-h-8 items-center justify-center gap-1 rounded-[6px] border border-[var(--line)] bg-white px-2 py-1 text-[0.7rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                            href={`/studio/profile?personId=${person.id}`}
+                          >
+                            <Pencil size={12} /> Edit
+                          </Link>
+                          {confirmingDeleteId === person.id ? (
+                            <>
+                              <button
+                                className="inline-flex min-h-8 items-center justify-center gap-1 rounded-[6px] border border-[var(--accent)] bg-[var(--accent)] px-2 py-1 text-[0.7rem] font-semibold text-white"
+                                type="button"
+                                disabled={deletingId === person.id}
+                                onClick={() => void onDelete(person)}
+                              >
+                                <Trash2 size={12} />
+                                {deletingId === person.id
+                                  ? "Deleting…"
+                                  : "Confirm"}
+                              </button>
+                              <button
+                                className="inline-flex min-h-8 items-center justify-center rounded-[6px] border border-[var(--line)] bg-white px-2 py-1 text-[0.7rem] font-semibold text-[var(--ink)]"
+                                type="button"
+                                disabled={deletingId === person.id}
+                                onClick={onCancelDelete}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className="inline-flex min-h-8 items-center justify-center gap-1 rounded-[6px] border border-[#f0c9c9] bg-white px-2 py-1 text-[0.7rem] font-semibold text-[var(--accent-deep)]"
+                              type="button"
+                              onClick={() => onRequestDelete(person)}
+                            >
+                              <Trash2 size={12} /> Delete
+                            </button>
+                          )}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 type ProfileDraft = {
   name: string;
   role: string;
   group: string;
+  education_level: string;
+  enrollment_year: string;
+  destination: string;
   email: string;
   website_url: string;
   research_interests: string;
@@ -2086,6 +2539,9 @@ function profileDraft(
     name: person?.name ?? user.full_name,
     role: person?.role ?? "Lab member",
     group: person?.group ?? "PhD Students",
+    education_level: person?.education_level ?? "",
+    enrollment_year: person?.enrollment_year?.toString() ?? "",
+    destination: person?.destination ?? "",
     email: person?.email ?? user.email,
     website_url: person?.website_url ?? "",
     research_interests: person?.research_interests.join(", ") ?? "",
@@ -2220,8 +2676,8 @@ function ProfileEditor({
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!draft.name.trim() || !draft.role.trim()) {
-      setMessage("Name and role are required.");
+    if (!draft.name.trim()) {
+      setMessage("Name is required.");
       return;
     }
     setSaving(true);
@@ -2241,8 +2697,13 @@ function ProfileEditor({
       }
       const payload = {
         name: draft.name.trim(),
-        role: draft.role.trim(),
+        role: draft.role.trim() || "Lab member",
         group: draft.group,
+        education_level: draft.education_level || null,
+        enrollment_year: draft.enrollment_year.trim()
+          ? Number(draft.enrollment_year)
+          : null,
+        destination: draft.destination.trim() || null,
         bio: draft.bio.trim() || null,
         research_interests: draft.research_interests
           .split(",")
@@ -2302,6 +2763,10 @@ function ProfileEditor({
           ? people.map((person) => (person.id === saved.id ? saved : person))
           : [saved, ...people],
       );
+      setDraft((current) => ({
+        ...current,
+        avatar_url: saved.avatar_url ?? null,
+      }));
       setAvatar(null);
       if (avatarInput.current) avatarInput.current.value = "";
       if (isEditingAnotherProfile) {
@@ -2359,31 +2824,27 @@ function ProfileEditor({
           value={draft.name}
           onChange={(value) => setDraft({ ...draft, name: value })}
         />
-        <Field
-          label="Role or title"
-          value={draft.role}
-          onChange={(value) => setDraft({ ...draft, role: value })}
-        />
-        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
-          <label htmlFor="profile-person-group">Directory category</label>
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none">
+          <label htmlFor="profile-person-education">Education / degree</label>
           <select
-            id="profile-person-group"
-            value={draft.group}
+            id="profile-person-education"
+            value={draft.education_level}
             onChange={(event) =>
-              setDraft({ ...draft, group: event.target.value })
+              setDraft({ ...draft, education_level: event.target.value })
             }
           >
-            <option value="PhD Students">PhD students</option>
-            <option value="Master's Students">Master&apos;s students</option>
-            <option value="Undergraduate Students">
-              Undergraduate students
-            </option>
-            <option value="Alumni">Alumni</option>
-            <option value="Faculty">Faculty</option>
-            <option value="Research Staff">Research staff</option>
-            <option value="Students">Other lab members</option>
+            <option value="">Not specified</option>
+            <option value="PhD">PhD</option>
+            <option value="Master's">Master&apos;s</option>
+            <option value="Undergraduate">Undergraduate</option>
           </select>
         </div>
+        <Field
+          label="Entry year"
+          type="number"
+          value={draft.enrollment_year}
+          onChange={(value) => setDraft({ ...draft, enrollment_year: value })}
+        />
         <Field
           label="Email"
           value={draft.email}
@@ -2410,35 +2871,21 @@ function ProfileEditor({
           </div>
         ) : null}
         <Field
-          label="Personal homepage"
-          value={draft.website_url}
-          onChange={(value) => setDraft({ ...draft, website_url: value })}
-        />
-        <Field
-          label="Research interests (comma separated)"
-          value={draft.research_interests}
-          full
-          onChange={(value) =>
-            setDraft({ ...draft, research_interests: value })
-          }
-        />
-        <Field
           label="Bio"
           value={draft.bio}
-          full
           textarea
+          compact
           onChange={(value) => setDraft({ ...draft, bio: value })}
         />
-        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
-          <label htmlFor="profile-avatar">Portrait</label>
-          <input
-            ref={avatarInput}
-            id="profile-avatar"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
-          />
-        </div>
+        <FileField
+          id="profile-avatar"
+          label="Portrait"
+          file={avatar}
+          existingUrl={draft.avatar_url}
+          accept="image/png,image/jpeg,image/webp"
+          inputRef={avatarInput}
+          onChange={setAvatar}
+        />
         <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
           <button
             className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
@@ -2472,6 +2919,9 @@ function PeopleCreatePanel({
   const [name, setName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [group, setGroup] = useState("PhD Students");
+  const [educationLevel, setEducationLevel] = useState("");
+  const [enrollmentYear, setEnrollmentYear] = useState("");
+  const [destination, setDestination] = useState("");
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
   const [interests, setInterests] = useState("");
@@ -2504,6 +2954,11 @@ function PeopleCreatePanel({
         name: name.trim(),
         role: jobTitle.trim(),
         group,
+        education_level: educationLevel || null,
+        enrollment_year: enrollmentYear.trim()
+          ? Number(enrollmentYear)
+          : null,
+        destination: destination.trim() || null,
         email: email.trim() || null,
         website_url: website.trim() || null,
         research_interests: interests
@@ -2528,6 +2983,9 @@ function PeopleCreatePanel({
       setName("");
       setJobTitle("");
       setGroup("PhD Students");
+      setEducationLevel("");
+      setEnrollmentYear("");
+      setDestination("");
       setEmail("");
       setWebsite("");
       setInterests("");
@@ -2545,17 +3003,6 @@ function PeopleCreatePanel({
 
   return (
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
-        <div>
-          <h2>
-            <Plus size={18} /> Add a person
-          </h2>
-          <p>Add a complete profile directly to the public People directory.</p>
-        </div>
-        <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
-          Publish access
-        </span>
-      </div>
       <form
         className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
         onSubmit={submit}
@@ -2581,6 +3028,30 @@ function PeopleCreatePanel({
             <option value="Research Staff">Research staff</option>
           </select>
         </div>
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
+          <label htmlFor="new-person-education">Education / degree</label>
+          <select
+            id="new-person-education"
+            value={educationLevel}
+            onChange={(event) => setEducationLevel(event.target.value)}
+          >
+            <option value="">Not specified</option>
+            <option value="PhD">PhD</option>
+            <option value="Master&apos;s">Master&apos;s</option>
+            <option value="Undergraduate">Undergraduate</option>
+          </select>
+        </div>
+        <Field
+          label="Entry year"
+          type="number"
+          value={enrollmentYear}
+          onChange={setEnrollmentYear}
+        />
+        <Field
+          label="Destination / next step"
+          value={destination}
+          onChange={setDestination}
+        />
         <Field label="Email" value={email} onChange={setEmail} />
         <Field
           label="Personal homepage"
@@ -2594,15 +3065,14 @@ function PeopleCreatePanel({
           onChange={setInterests}
         />
         <Field label="Bio" value={bio} full textarea onChange={setBio} />
-        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
-          <label htmlFor="new-person-avatar">Portrait</label>
-          <input
-            id="new-person-avatar"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(event) => setAvatar(event.target.files?.[0] ?? null)}
-          />
-        </div>
+        <FileField
+          id="new-person-avatar"
+          label="Portrait"
+          file={avatar}
+          accept="image/png,image/jpeg,image/webp"
+          large
+          onChange={setAvatar}
+        />
         <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
           <button
             className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
@@ -2623,44 +3093,13 @@ function PeopleCreatePanel({
   );
 }
 
-function UsersPanel({
-  token,
-  currentUserId,
-}: {
-  token: string;
-  currentUserId: number;
-}) {
-  const [users, setUsers] = useState<AdminUser[]>([]);
+function UserCreatePanel({ token }: { token: string }) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("contributor");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  const [savingUserId, setSavingUserId] = useState<number | null>(null);
-  const adminCount = users.filter((user) => user.role === "admin").length;
-
-  const loadUsers = useCallback(async () => {
-    try {
-      const response = await fetch(`${apiBase}/api/admin/users`, {
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error("Could not load accounts.");
-      setUsers((await response.json()) as AdminUser[]);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not load accounts.",
-      );
-    }
-  }, [token]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadUsers();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadUsers]);
 
   async function createAccount(event: FormEvent) {
     event.preventDefault();
@@ -2684,20 +3123,107 @@ function UsersPanel({
       setEmail("");
       setFullName("");
       setPassword("");
-      setMessage(
-        "Account created. Share the credentials through your usual secure channel.",
-      );
-      await loadUsers();
+      setMessage("Account created.");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "The API is offline. Start the containers before creating an account.",
+          : "Could not create the account.",
       );
     } finally {
       setSaving(false);
     }
   }
+
+  return (
+    <div className="rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <form
+        className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
+        onSubmit={createAccount}
+      >
+        <Field label="Full name" value={fullName} onChange={setFullName} />
+        <Field label="Email" value={email} onChange={setEmail} />
+        <Field
+          label="Temporary password"
+          value={password}
+          onChange={setPassword}
+        />
+        <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none">
+          <label htmlFor="quick-user-role">Role</label>
+          <select
+            id="quick-user-role"
+            value={role}
+            onChange={(event) => setRole(event.target.value as UserRole)}
+          >
+            <option value="contributor">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div className="col-span-full flex justify-end pt-1 max-[700px]:col-auto">
+          <button
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
+            type="submit"
+            disabled={saving}
+          >
+            <Users size={15} />
+            {saving ? "Creating…" : "Create account"}
+          </button>
+        </div>
+      </form>
+      {message ? (
+        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+          {message}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function UsersPanel({
+  token,
+  currentUserId,
+  onUnauthorized,
+}: {
+  token: string;
+  currentUserId: number;
+  onUnauthorized: () => void;
+}) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [message, setMessage] = useState("");
+  const [usersError, setUsersError] = useState("");
+  const [savingUserId, setSavingUserId] = useState<number | null>(null);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const adminCount = users.filter((user) => user.role === "admin").length;
+
+  const loadUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    setUsersError("");
+    try {
+      const response = await fetch(`${apiBase}/api/admin/users`, {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status === 401) {
+        onUnauthorized();
+        return;
+      }
+      if (!response.ok) throw new Error("Could not load accounts.");
+      setUsers((await response.json()) as AdminUser[]);
+    } catch (error) {
+      setUsersError(
+        error instanceof Error ? error.message : "Could not load accounts.",
+      );
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [onUnauthorized, token]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadUsers();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadUsers]);
 
   async function updateUser(
     user: AdminUser,
@@ -2772,58 +3298,6 @@ function UsersPanel({
       <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
         <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
-            <h2>Create collaborator account</h2>
-            <p>
-              Invite people through a controlled account workflow so publishing
-              remains reliable.
-            </p>
-          </div>
-          <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
-            Admin only
-          </span>
-        </div>
-        <form
-          className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-[14px] max-[700px]:grid-cols-1"
-          onSubmit={createAccount}
-        >
-          <Field label="Full name" value={fullName} onChange={setFullName} />
-          <Field label="Email" value={email} onChange={setEmail} />
-          <Field
-            label="Temporary password"
-            value={password}
-            onChange={setPassword}
-          />
-          <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
-            <label htmlFor="new-user-role">Role</label>
-            <select
-              id="new-user-role"
-              value={role}
-              onChange={(event) => setRole(event.target.value as UserRole)}
-            >
-              <option value="contributor">User</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div className="col-span-full flex justify-end gap-2 pt-1 max-[700px]:col-auto">
-            <button
-              className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
-              type="submit"
-              disabled={saving}
-            >
-              <Users size={15} />
-              {saving ? "Creating…" : "Create account"}
-            </button>
-          </div>
-        </form>
-        {message ? (
-          <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
-            {message}
-          </div>
-        ) : null}
-      </div>
-      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
-          <div>
             <h2>Accounts</h2>
             <p>
               Change roles or delete accounts. Your own Admin access cannot be
@@ -2831,11 +3305,45 @@ function UsersPanel({
             </p>
           </div>
           <span className="inline-flex items-center rounded-full bg-[#eef7ee] px-2 py-1 text-[0.7rem] font-bold text-[#31733d]">
-            {adminCount}/5 admins · {users.length} accounts
+            {loadingUsers
+              ? "Loading…"
+              : usersError
+                ? "Unavailable"
+                : `${adminCount}/5 admins · ${users.length} accounts`}
           </span>
         </div>
+        {message ? (
+          <div className="mb-3 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+            {message}
+          </div>
+        ) : null}
         <div className="grid gap-[9px]">
-          {users.map((user) => (
+          {loadingUsers ? (
+            <p className="py-3 text-[0.84rem] text-[var(--slate)]">
+              Loading accounts…
+            </p>
+          ) : null}
+          {!loadingUsers && usersError ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <p className="m-0 text-[0.84rem] text-[var(--slate)]">
+                Accounts could not be loaded.
+              </p>
+              <button
+                className="inline-flex min-h-8 items-center rounded-[7px] border border-[var(--line)] bg-white px-3 py-1.5 text-[0.78rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                type="button"
+                onClick={() => void loadUsers()}
+              >
+                Try again
+              </button>
+            </div>
+          ) : null}
+          {!loadingUsers && !usersError && !users.length ? (
+            <p className="py-3 text-[0.84rem] text-[var(--slate)]">
+              No accounts yet.
+            </p>
+          ) : null}
+          {!loadingUsers && !usersError
+            ? users.map((user) => (
             <div
               className="flex items-center justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:items-start max-[720px]:flex-col"
               key={user.id}
@@ -2875,7 +3383,8 @@ function UsersPanel({
                 </button>
               </div>
             </div>
-          ))}
+          ))
+            : null}
         </div>
       </div>
     </>

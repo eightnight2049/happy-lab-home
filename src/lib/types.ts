@@ -39,6 +39,9 @@ export interface Person {
   name: string;
   role: string;
   group: string;
+  education_level?: string | null;
+  enrollment_year?: number | null;
+  destination?: string | null;
   bio?: string | null;
   research_interests: string[];
   email?: string | null;

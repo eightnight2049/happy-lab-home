@@ -32,6 +32,60 @@ def seed(db: Session) -> None:
         db.add_all([ResearchArea(kicker="01 · Learn", title="World models for action", description="Predictive representations that connect perception, language, and action so robots can plan before they move.", accent="red", sort_order=1), ResearchArea(kicker="02 · Adapt", title="Generalizable manipulation", description="Learning skills that transfer across objects, embodiments, and the long tail of real-world environments.", accent="amber", sort_order=2), ResearchArea(kicker="03 · Trust", title="Safe autonomy", description="Uncertainty-aware policies and evaluation tools for robots that remain dependable around people.", accent="ink", sort_order=3)])
     if not db.scalar(select(Person).limit(1)):
         db.add_all([Person(name="Dr. Xiaodong Yue", role="Principal Investigator", group="Faculty", bio="Xiaodong leads the lab's work on learning-based control and trustworthy autonomy.", research_interests=["Robot learning", "Safe control", "World models"], email="lin.zhao@motionlab.example", website_url="https://example.com", avatar_url="/Xiaodong-transparent.png", sort_order=1), Person(name="Maya Chen", role="PhD Student", group="Students", bio="Maya studies active data collection for dexterous manipulation.", research_interests=["Manipulation", "Active learning"], email="maya.chen@motionlab.example", sort_order=2), Person(name="Ethan Wu", role="PhD Student", group="Students", bio="Ethan works on calibrated uncertainty for robot planning.", research_interests=["Planning", "Uncertainty"], email="ethan.wu@motionlab.example", sort_order=3), Person(name="Aria Patel", role="Research Engineer", group="Research staff", bio="Aria builds the hardware and software systems behind our experiments.", research_interests=["Systems", "Hardware"], email="aria.patel@motionlab.example", sort_order=4), Person(name="Noah Kim", role="Visiting Student", group="Students", bio="Noah explores multimodal policies for mobile manipulation.", research_interests=["Vision-language", "Mobile robots"], email="noah.kim@motionlab.example", sort_order=5)])
+    alumni_rows = db.scalars(
+        select(Person)
+        .where(func.lower(Person.group) == "alumni")
+        .order_by(Person.sort_order, Person.id)
+    ).all()
+    alumni_defaults = [
+        ("PhD", 2014, "Assistant Professor · ShanghaiTech University"),
+        ("PhD", 2016, "Research Scientist · NVIDIA Research"),
+        ("PhD", 2018, "Principal Engineer · ABB Robotics"),
+        ("Master's", 2019, "Machine Learning Engineer · ByteDance"),
+        ("Master's", 2020, "Research Engineer · DJI"),
+        ("Master's", 2021, "Product Data Scientist · Medtronic"),
+        ("Undergraduate", 2021, "M.S. student · Carnegie Mellon University"),
+        ("Undergraduate", 2022, "M.S. student · University of Toronto"),
+        ("Undergraduate", 2023, "Software Engineer · Huawei"),
+    ]
+    if not alumni_rows:
+        sample_alumni = [
+            "Mina Zhou",
+            "Evan Lin",
+            "Jiawen Wu",
+            "Yifan Xu",
+            "Siyu Wang",
+            "Leo Chen",
+        ]
+        for index, name in enumerate(sample_alumni):
+            level, year, destination = alumni_defaults[index]
+            db.add(
+                Person(
+                    name=name,
+                    role="Lab Alumnus",
+                    group="Alumni",
+                    education_level=level,
+                    enrollment_year=year,
+                    destination=destination,
+                    bio="Former member of the Motion Intelligence Lab.",
+                    research_interests=[],
+                    sort_order=100 + index,
+                )
+            )
+        db.flush()
+        alumni_rows = db.scalars(
+            select(Person)
+            .where(func.lower(Person.group) == "alumni")
+            .order_by(Person.sort_order, Person.id)
+        ).all()
+    for index, row in enumerate(alumni_rows):
+        default_level, default_year, default_destination = alumni_defaults[index % len(alumni_defaults)]
+        if row.education_level is None:
+            row.education_level = default_level
+        if row.enrollment_year is None:
+            row.enrollment_year = default_year
+        if row.destination is None:
+            row.destination = default_destination
     if not db.scalar(select(NewsItem).limit(1)):
         db.add_all([NewsItem(date=date(2026, 8, 18), title="New preprint available", body="Our new work on uncertainty-aware visuomotor policies is now available as a preprint.", href="/publications", tag="Publication", sort_order=1), NewsItem(date=date(2026, 7, 4), title="Best Paper Award at RoboLearn 2026", body="Congratulations to the team for receiving the Best Paper Award for Safe Policy Improvement with World Models.", tag="Award", sort_order=2), NewsItem(date=date(2026, 6, 12), title="We are welcoming new students", body="Applications are open for motivated students interested in robot learning and embodied intelligence.", href="/join", tag="Lab", sort_order=3), NewsItem(date=date(2026, 4, 22), title="The lab is growing", body="Three new members have joined our group to work on dexterous manipulation and safe navigation.", href="/people", tag="People", sort_order=4)])
     if not db.scalar(select(Publication).limit(1)):
@@ -57,6 +111,12 @@ def migrate_schema() -> None:
             connection.execute(text("ALTER TABLE publications ADD COLUMN created_by_id INTEGER"))
         if "created_by_id" not in people_columns:
             connection.execute(text("ALTER TABLE people ADD COLUMN created_by_id INTEGER"))
+        if "education_level" not in people_columns:
+            connection.execute(text("ALTER TABLE people ADD COLUMN education_level VARCHAR(60)"))
+        if "enrollment_year" not in people_columns:
+            connection.execute(text("ALTER TABLE people ADD COLUMN enrollment_year INTEGER"))
+        if "destination" not in people_columns:
+            connection.execute(text("ALTER TABLE people ADD COLUMN destination VARCHAR(240)"))
         if "created_by_id" not in news_columns:
             connection.execute(text("ALTER TABLE news_items ADD COLUMN created_by_id INTEGER"))
         # The portal now has exactly two account roles. Existing non-admin
