@@ -40,6 +40,7 @@ export function PersonAvatar({
           src={person.avatar_url}
           alt=""
           fill
+          loading={isLabMark ? "eager" : "lazy"}
           unoptimized
         />
       ) : null}
