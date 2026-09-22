@@ -630,6 +630,8 @@ function AdminSidebar({
             <Link
               className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[7px] border border-[#efd4d4] bg-[#fffafa] px-2 py-2 text-[0.78rem] font-semibold text-[var(--accent-deep)] whitespace-nowrap hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
               href="/"
+              target="_blank"
+              rel="noreferrer"
             >
               <House size={15} /> <span>Lab home ↗</span>
             </Link>
