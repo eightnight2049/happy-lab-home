@@ -1160,6 +1160,11 @@ function NewsPanel({
               approval is handled on Overview.
             </p>
           </div>
+          <span className="inline-flex shrink-0 items-center rounded-full bg-[#eef7ee] px-2.5 py-1 text-[0.7rem] font-bold text-[#31733d]">
+            {filteredItems.length}
+            {filteredItems.length !== items.length ? ` of ${items.length}` : ""}{" "}
+            {filteredItems.length === 1 ? "item" : "items"}
+          </span>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <label className="relative min-w-[200px] flex-[1_1_260px]">
@@ -1496,6 +1501,11 @@ function PublicationsPanel({
               approval is handled on Overview.
             </p>
           </div>
+          <span className="inline-flex shrink-0 items-center rounded-full bg-[#eef7ee] px-2.5 py-1 text-[0.7rem] font-bold text-[#31733d]">
+            {filteredItems.length}
+            {filteredItems.length !== items.length ? ` of ${items.length}` : ""}{" "}
+            {filteredItems.length === 1 ? "work" : "works"}
+          </span>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <label className="relative min-w-[200px] flex-[1_1_260px]">
