@@ -2382,7 +2382,7 @@ function ReviewQueuePanel({
           const key = itemKey(item);
           return (
             <div
-              className="flex items-start justify-between gap-4 rounded-[8px] border border-[var(--line-soft)] bg-[#fcfcfa] px-3.5 py-3 max-[720px]:flex-col"
+              className="flex items-center justify-between gap-4 rounded-[8px] border border-[var(--line-soft)] bg-[#fcfcfa] px-3.5 py-3 max-[720px]:items-start max-[720px]:flex-col"
               key={key}
             >
               <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
