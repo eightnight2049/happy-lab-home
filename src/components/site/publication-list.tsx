@@ -15,7 +15,7 @@ const filters = ["All", "Conference", "Journal", "Preprint"];
 const paperActionClass =
   "inline-flex items-center gap-1 rounded-[4px] border border-[var(--accent)] bg-[var(--accent)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]";
 const codeActionClass =
-  "inline-flex items-center gap-1 rounded-[4px] border border-[var(--slate)] bg-[var(--slate)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:border-[var(--ink-soft)] hover:bg-[var(--ink-soft)]";
+  "inline-flex items-center gap-1 rounded-[4px] border border-[var(--ink)] bg-[var(--ink)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:bg-black";
 const otherActionClass =
   "inline-flex items-center gap-1 rounded-[4px] border border-[var(--line)] bg-white px-[11px] py-[5px] text-[0.86rem] font-medium text-[var(--ink-soft)] hover:border-[var(--ink-soft)] hover:bg-[var(--bg-muted)] hover:text-[var(--ink)]";
 
