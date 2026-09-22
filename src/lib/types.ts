@@ -79,8 +79,24 @@ export interface ReviewQueueItem {
   content_type: "news" | "publication" | "person";
   title: string;
   summary: string;
-  status: "Pending review";
+  status: string;
   created_by_id?: number | null;
+  created_at?: string | null;
+  submission_id?: number | null;
+  action?: string | null;
+}
+
+export interface SubmissionItem {
+  id: number;
+  content_type: "news" | "publication" | "person";
+  action: string;
+  content_id: number | null;
+  title: string;
+  summary: string;
+  status: "pending" | "approved" | "rejected" | "withdrawn" | "cleared";
+  submitted_by_id: number;
+  created_at: string;
+  reviewed_at?: string | null;
 }
 
 export interface FeedbackItem {

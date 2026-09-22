@@ -41,6 +41,7 @@ import type {
   Publication,
   ReviewQueueItem,
   SiteSnapshot,
+  SubmissionItem,
   UserRole,
 } from "@/lib/types";
 import {
@@ -77,7 +78,13 @@ function adminViewPath(view: AdminView) {
 }
 type Session = {
   token: string;
-  user: { id: number; email: string; full_name: string; role: UserRole };
+  user: {
+    id: number;
+    email: string;
+    full_name: string;
+    role: UserRole;
+    created_at?: string | null;
+  };
 };
 type AdminUser = Session["user"] & { is_active: boolean };
 
@@ -105,6 +112,16 @@ function formatRunningTime(startedAt?: string | null, now?: Date | null) {
   const elapsedSeconds = Math.floor((now.getTime() - start.getTime()) / 1000);
   const days = Math.floor(elapsedSeconds / 86_400);
   return `${days}d`;
+}
+
+function formatTimestamp(value?: string | null) {
+  if (!value) return "Time unavailable";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Time unavailable";
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function normalizeSession(session: Session): Session {
@@ -228,6 +245,16 @@ export function AdminDashboard({
     return () => window.clearTimeout(timer);
   }, [session]);
 
+  useEffect(() => {
+    if (session?.user.role === "admin") return;
+    if (view !== "settings" && view !== "users") return;
+    const timer = window.setTimeout(() => {
+      setView("overview");
+      router.replace("/studio");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [router, session?.user.role, view]);
+
   function onLogin(next: Session) {
     setSnapshotLoaded(false);
     setSnapshotError("");
@@ -256,12 +283,13 @@ export function AdminDashboard({
     item: ReviewQueueItem,
     action: "publish" | "delete",
   ) {
+    const removesContent = action === "delete" && item.action !== "update";
     setSnapshot((current) => {
       if (item.content_type === "news")
         return {
           ...current,
           news:
-            action === "delete"
+            removesContent
               ? current.news.filter((entry) => entry.id !== item.id)
               : current.news.map((entry) =>
                   entry.id === item.id
@@ -273,7 +301,7 @@ export function AdminDashboard({
         return {
           ...current,
           publications:
-            action === "delete"
+            removesContent
               ? current.publications.filter((entry) => entry.id !== item.id)
               : current.publications.map((entry) =>
                   entry.id === item.id
@@ -288,7 +316,7 @@ export function AdminDashboard({
       return {
         ...current,
         people:
-          action === "delete"
+          removesContent
             ? current.people.filter((entry) => entry.id !== item.id)
             : current.people.map((entry) =>
                 entry.id === item.id
@@ -297,15 +325,27 @@ export function AdminDashboard({
               ),
       };
     });
+    void refreshSnapshot(session?.token);
   }
 
   const canManageUsers = session?.user.role === "admin";
+  const canManageSettings = session?.user.role === "admin";
   const nav: AdminNavItem[] = [
     { key: "overview", label: "Overview", icon: Gauge },
-    { key: "settings", label: "Site settings", icon: Settings },
+    {
+      key: "settings",
+      label: "Site settings",
+      icon: Settings,
+      hidden: !canManageSettings,
+    },
     { key: "news", label: "News", icon: Newspaper },
     { key: "publications", label: "Publications", icon: FileText },
     { key: "people", label: "People", icon: Users },
+    {
+      key: "profile",
+      label: "My profile",
+      icon: UserRound,
+    },
     {
       key: "users",
       label: "Account",
@@ -384,7 +424,7 @@ export function AdminDashboard({
                     quickAction={selectedQuickAction}
                   />
                 ) : null}
-                {view === "settings" ? (
+                {view === "settings" && canManageSettings ? (
                   <SettingsPanel
                     settings={snapshot.settings}
                     token={session.token}
@@ -634,12 +674,14 @@ function LoginCard({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
       const endpoint = mode === "login" ? "login" : "register";
       const body =
@@ -652,7 +694,16 @@ function LoginCard({
         body: JSON.stringify(body),
       });
       if (response.ok) {
-        onLogin((await response.json()) as Session);
+        if (mode === "register") {
+          const result = (await response.json()) as { message?: string };
+          setSuccess(
+            result.message ??
+              "Registration submitted. An administrator must approve your account before you can sign in.",
+          );
+          setPassword("");
+        } else {
+          onLogin((await response.json()) as Session);
+        }
         return;
       }
       const payload = (await response.json().catch(() => null)) as {
@@ -708,7 +759,7 @@ function LoginCard({
         >
           {mode === "register" ? (
             <div className="grid gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-[var(--slate)] [&_input]:w-full [&_input]:rounded-[7px] [&_input]:border [&_input]:border-[#d8d8d2] [&_input]:bg-white [&_input]:px-[11px] [&_input]:py-2.5 [&_input]:text-[var(--ink)] [&_input]:outline-none [&_textarea]:w-full [&_textarea]:min-h-[110px] [&_textarea]:resize-y [&_textarea]:rounded-[7px] [&_textarea]:border [&_textarea]:border-[#d8d8d2] [&_textarea]:bg-white [&_textarea]:px-[11px] [&_textarea]:py-2.5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-none [&_select]:w-full [&_select]:rounded-[7px] [&_select]:border [&_select]:border-[#d8d8d2] [&_select]:bg-white [&_select]:px-[11px] [&_select]:py-2.5 [&_select]:text-[var(--ink)] [&_select]:outline-none [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-soft)] [&_select:focus]:border-[var(--accent)] [&_select:focus]:shadow-[0_0_0_3px_var(--accent-soft)]">
-              <label htmlFor="portal-name">Full name</label>
+              <label htmlFor="portal-name">Full name (English)</label>
               <input
                 id="portal-name"
                 value={fullName}
@@ -755,6 +806,11 @@ function LoginCard({
         {error ? (
           <div className="mt-2.5 rounded-[7px] bg-[#fff0f0] px-3 py-2.5 text-[0.82rem] text-[var(--accent-deep)]">
             {error}
+          </div>
+        ) : null}
+        {success ? (
+          <div className="mt-2.5 rounded-[7px] bg-[#eef7ee] px-3 py-2.5 text-[0.82rem] text-[#31733d]">
+            {success}
           </div>
         ) : null}
       </div>
@@ -862,7 +918,9 @@ function Overview({
       </div>
       {accountRole === "admin" ? (
         <ReviewQueuePanel token={token} onChanged={onChanged} />
-      ) : null}
+      ) : (
+        <MyReviewQueuePanel token={token} />
+      )}
     </>
   );
 }
@@ -1170,7 +1228,7 @@ function NewsPanel({
   }, [items, query, yearFilter]);
   const canEdit = (item: NewsItem) =>
     accountRole === "admin" ||
-    (item.is_published === false && item.created_by_id === currentUserId);
+    item.created_by_id === currentUserId;
 
   async function deleteItem(item: NewsItem) {
     setDeletingId(item.id);
@@ -1549,7 +1607,7 @@ function PublicationsPanel({
   }, [items, query, typeFilter, yearFilter]);
   const canEdit = (item: Publication) =>
     accountRole === "admin" ||
-    (item.is_published === false && item.created_by_id === currentUserId);
+    item.created_by_id === currentUserId;
 
   async function deleteItem(item: Publication) {
     setDeletingId(item.id);
@@ -1985,6 +2043,175 @@ function PublicationEditor({
   );
 }
 
+function MyReviewQueuePanel({ token }: { token: string }) {
+  const [items, setItems] = useState<SubmissionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [workingId, setWorkingId] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${apiBase}/api/admin/my-submissions`, {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Could not load your submissions.");
+      setItems((await response.json()) as SubmissionItem[]);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  function editHref(item: SubmissionItem) {
+    if (item.content_type === "news") return `/studio/news?edit=${item.content_id}`;
+    if (item.content_type === "publication") {
+      return `/studio/publications?edit=${item.content_id}`;
+    }
+    return "/studio/profile";
+  }
+
+  async function updateStatus(item: SubmissionItem, action: "withdraw" | "clear") {
+    setWorkingId(item.id);
+    setMessage("");
+    try {
+      const response = await fetch(
+        `${apiBase}/api/admin/submissions/${item.id}/${action}`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!response.ok) throw new Error("Could not update this message.");
+      setItems((current) => current.filter((entry) => entry.id !== item.id));
+      setMessage(
+        action === "withdraw"
+          ? "Submission withdrawn."
+          : "Message cleared.",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not update this message.",
+      );
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  const pendingCount = items.filter((item) => item.status === "pending").length;
+  const contentLabels = {
+    news: "News",
+    publication: "Publication",
+    person: "My profile",
+  } as const;
+  const statusLabels = {
+    pending: "Pending review",
+    approved: "Approved",
+    rejected: "Rejected",
+    withdrawn: "Withdrawn",
+    cleared: "Cleared",
+  } as const;
+  const statusClasses = {
+    pending: "bg-[#fff4dc] text-[#8a5a00]",
+    approved: "bg-[#eef7ee] text-[#31733d]",
+    rejected: "bg-[#fff0f0] text-[var(--accent-deep)]",
+    withdrawn: "bg-[#f2f2ef] text-[var(--slate)]",
+    cleared: "bg-[#f2f2ef] text-[var(--slate)]",
+  } as const;
+
+  return (
+    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+      <div className="mb-[14px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem]">
+        <div>
+          <h2>My review queue</h2>
+          <p className="m-0 mt-1 text-[0.84rem] text-[var(--slate)]">
+            Your submissions stay here until you clear the message.
+          </p>
+        </div>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${pendingCount ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
+        >
+          {pendingCount} pending
+        </span>
+      </div>
+      {message ? (
+        <div className="mb-3 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
+          {message}
+        </div>
+      ) : null}
+      {loading ? <p className="text-[var(--slate)]">Loading submissions…</p> : null}
+      {!loading && !items.length ? (
+        <div className="flex items-center gap-2 py-3 text-[0.9rem] text-[#31733d]">
+          <CheckCircle2 size={18} />
+          <span>No submission messages.</span>
+        </div>
+      ) : null}
+      <div className="grid gap-[9px]">
+        {items.map((item) => (
+          <div
+            className="flex items-start justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:flex-col"
+            key={item.id}
+          >
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-[var(--mono)] text-[0.68rem] font-bold uppercase tracking-[0.06em] text-[var(--accent-deep)]">
+                  {contentLabels[item.content_type]}
+                </span>
+                <span className={`inline-flex items-center rounded-full px-2 py-1 text-[0.68rem] font-bold ${statusClasses[item.status]}`}>
+                  {statusLabels[item.status]}
+                </span>
+              </div>
+              <strong className="mt-1 block overflow-hidden text-[0.9rem] text-ellipsis whitespace-nowrap">
+                {item.title}
+              </strong>
+              <span className="mt-0.5 block overflow-hidden text-[0.76rem] text-ellipsis whitespace-nowrap text-[var(--slate)]">
+                {item.summary}
+              </span>
+              <span className="mt-1 block text-[0.72rem] text-[var(--slate-light)]">
+                Submitted {formatTimestamp(item.created_at)}
+                {item.reviewed_at ? ` · Updated ${formatTimestamp(item.reviewed_at)}` : ""}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
+              {item.status === "pending" ? (
+                <>
+                  <Link
+                    className="inline-flex min-h-[38px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-2 text-[0.82rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                    href={editHref(item)}
+                  >
+                    <Pencil size={14} /> Edit
+                  </Link>
+                  <button
+                    className="inline-flex min-h-[38px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-3 py-2 text-[0.82rem] font-semibold text-[var(--accent-deep)]"
+                    type="button"
+                    disabled={workingId === item.id}
+                    onClick={() => void updateStatus(item, "withdraw")}
+                  >
+                    {workingId === item.id ? "Working…" : "Withdraw"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="inline-flex min-h-[38px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-2 text-[0.82rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                  type="button"
+                  disabled={workingId === item.id}
+                  onClick={() => void updateStatus(item, "clear")}
+                >
+                  {workingId === item.id ? "Working…" : "Clear message"}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ReviewQueuePanel({
   token,
   onChanged,
@@ -2034,18 +2261,24 @@ function ReviewQueuePanel({
     return `/api/admin/people/${item.id}`;
   }
 
+  function itemKey(item: ReviewQueueItem) {
+    return `${item.content_type}-${item.submission_id ?? item.id}`;
+  }
+
   async function publish(item: ReviewQueueItem) {
-    const key = `${item.content_type}-${item.id}`;
+    const key = itemKey(item);
     setWorkingKey(key);
     setMessage("");
     try {
       const response = await fetch(
-        `${apiBase}/api/admin/review-queue/${item.content_type}/${item.id}/publish`,
+        item.submission_id
+          ? `${apiBase}/api/admin/submissions/${item.submission_id}/approve`
+          : `${apiBase}/api/admin/review-queue/${item.content_type}/${item.id}/publish`,
         { method: "POST", headers: { Authorization: `Bearer ${token}` } },
       );
       if (!response.ok) throw new Error("Could not publish this submission.");
       setItems((current) =>
-        current.filter((entry) => `${entry.content_type}-${entry.id}` !== key),
+        current.filter((entry) => itemKey(entry) !== key),
       );
       onChanged(item, "publish");
       setMessage(`${item.title} is now public.`);
@@ -2067,17 +2300,22 @@ function ReviewQueuePanel({
       )
     )
       return;
-    const key = `${item.content_type}-${item.id}`;
+    const key = itemKey(item);
     setWorkingKey(key);
     setMessage("");
     try {
-      const response = await fetch(`${apiBase}${deleteHref(item)}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(
+        item.submission_id
+          ? `${apiBase}/api/admin/submissions/${item.submission_id}/reject`
+          : `${apiBase}${deleteHref(item)}`,
+        {
+          method: item.submission_id ? "POST" : "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       if (!response.ok) throw new Error("Could not remove this submission.");
       setItems((current) =>
-        current.filter((entry) => `${entry.content_type}-${entry.id}` !== key),
+        current.filter((entry) => itemKey(entry) !== key),
       );
       onChanged(item, "delete");
       setMessage(`${item.title} was removed.`);
@@ -2123,7 +2361,7 @@ function ReviewQueuePanel({
       ) : null}
       <div className="grid gap-[9px]">
         {items.map((item) => {
-          const key = `${item.content_type}-${item.id}`;
+          const key = itemKey(item);
           return (
             <div
               className="flex items-start justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:flex-col"
@@ -2135,6 +2373,9 @@ function ReviewQueuePanel({
                 </span>
                 <strong>{item.title}</strong>
                 <span>{item.summary}</span>
+                <span className="mt-1 block text-[0.7rem] text-[var(--slate-light)]">
+                  Submitted {formatTimestamp(item.created_at)}
+                </span>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
                 <button
@@ -3518,6 +3759,10 @@ function UsersPanel({
               <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
                 <strong>{user.full_name || user.email}</strong>
                 <span>{user.email}</span>
+                <span className={user.is_active ? "text-[#31733d]" : "text-[#8a5a00]"}>
+                  {user.is_active ? "Active" : "Pending approval"}
+                  {user.created_at ? ` · ${formatTimestamp(user.created_at)}` : ""}
+                </span>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
                 <select
@@ -3535,6 +3780,16 @@ function UsersPanel({
                   <option value="contributor">User</option>
                   <option value="admin">Admin</option>
                 </select>
+                {!user.is_active ? (
+                  <button
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white"
+                    type="button"
+                    disabled={savingUserId === user.id}
+                    onClick={() => void updateUser(user, { is_active: true })}
+                  >
+                    {savingUserId === user.id ? "Working…" : "Approve account"}
+                  </button>
+                ) : null}
                 {confirmingDeleteId === user.id ? (
                   <>
                     <button

@@ -17,6 +17,11 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8)
 
 
+class RegisterResponse(BaseModel):
+    status: Literal["pending"]
+    message: str
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -24,6 +29,7 @@ class UserOut(BaseModel):
     full_name: str
     role: Literal["admin", "contributor"]
     is_active: bool
+    created_at: datetime | None = None
 
 
 class LoginResponse(BaseModel):
@@ -62,6 +68,7 @@ class NewsPayload(BaseModel):
 class NewsOut(NewsPayload):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    created_by_id: int | None = None
 
 
 class ResearchOut(BaseModel):
@@ -119,12 +126,29 @@ class ReviewQueueItem(BaseModel):
     summary: str
     status: str
     created_by_id: int | None = None
+    created_at: datetime | None = None
+    submission_id: int | None = None
+    action: str | None = None
 
 
 class ReviewActionOut(BaseModel):
     id: int
     content_type: Literal["news", "publication", "person"]
-    status: Literal["published"]
+    status: Literal["published", "approved", "rejected", "withdrawn", "cleared"]
+
+
+class SubmissionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    content_type: Literal["news", "publication", "person"]
+    action: str
+    content_id: int | None
+    title: str
+    summary: str
+    status: Literal["pending", "approved", "rejected", "withdrawn", "cleared"]
+    submitted_by_id: int
+    created_at: datetime
+    reviewed_at: datetime | None = None
 
 
 class AccountRolePayload(BaseModel):

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
@@ -10,10 +10,11 @@ from sqlalchemy.orm import Session
 
 from .auth import create_access_token, get_current_user, hash_password, require_roles, verify_password
 from .db import SessionLocal, engine, get_db, settings
-from .models import Base, Feedback, LabSettings, NewsItem, Person, Publication, ResearchArea, User
+from .models import Base, Feedback, LabSettings, NewsItem, Person, Publication, ResearchArea, Submission, User
 from .schemas import (AccountRolePayload, AdminPersonOut, AdminPublicationOut, CreateUserRequest, FeedbackOut, FeedbackPayload, FeedbackStatusPayload, HomeOut, LoginRequest,
                       LoginResponse, NewsOut, NewsPayload, PersonOut, PersonPayload, PublicationOut, PublicationPayload,
-                      RegisterRequest, ResearchOut, ReviewActionOut, ReviewQueueItem, SettingsOut, SettingsPayload, UpdateUserRequest, UserOut, VisitOut)
+                      RegisterRequest, RegisterResponse, ResearchOut, ReviewActionOut, ReviewQueueItem, SettingsOut, SettingsPayload, SubmissionOut,
+                      UpdateUserRequest, UserOut, VisitOut)
 
 app = FastAPI(title="Motion Intelligence Lab API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
 MAX_ADMIN_COUNT = 5
@@ -124,6 +125,84 @@ def migrate_schema() -> None:
         connection.execute(text("UPDATE users SET role = 'contributor' WHERE role <> 'admin'"))
 
 
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def save_submission(
+    db: Session,
+    user: User,
+    content_type: str,
+    action: str,
+    content_id: int,
+    payload: dict,
+    title: str,
+    summary: str,
+) -> Submission:
+    row = db.scalar(
+        select(Submission)
+        .where(
+            Submission.submitted_by_id == user.id,
+            Submission.content_type == content_type,
+            Submission.content_id == content_id,
+            Submission.status == "pending",
+        )
+        .order_by(Submission.id.desc())
+    )
+    if row is None:
+        row = Submission(
+            content_type=content_type,
+            action=action,
+            content_id=content_id,
+            submitted_by_id=user.id,
+            title=title,
+            summary=summary,
+            payload=payload,
+            status="pending",
+        )
+        db.add(row)
+    else:
+        row.action = action
+        row.title = title
+        row.summary = summary
+        row.payload = payload
+        row.status = "pending"
+        row.created_at = now_utc()
+        row.reviewed_at = None
+        row.reviewed_by_id = None
+        row.cleared_at = None
+    db.flush()
+    return row
+
+
+def sync_pending_submission(
+    db: Session,
+    content_type: str,
+    content_id: int,
+    payload: dict,
+    title: str,
+    summary: str,
+) -> None:
+    row = db.scalar(
+        select(Submission)
+        .where(
+            Submission.content_type == content_type,
+            Submission.content_id == content_id,
+            Submission.status == "pending",
+        )
+        .order_by(Submission.id.desc())
+    )
+    if row:
+        row.payload = payload
+        row.title = title
+        row.summary = summary
+        row.created_at = now_utc()
+
+
+def submission_out(row: Submission) -> SubmissionOut:
+    return SubmissionOut.model_validate(row)
+
+
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
@@ -140,21 +219,65 @@ def health() -> dict[str, str]:
 @app.post("/api/auth/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     user = db.scalar(select(User).where(User.email == payload.email.lower().strip()))
-    if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
+    if user and not user.is_active and verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your account is waiting for administrator approval")
+    if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email or password is incorrect")
     return LoginResponse(token=create_access_token(user), user=UserOut.model_validate(user))
 
 
-@app.post("/api/auth/register", response_model=LoginResponse, status_code=201)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> LoginResponse:
+@app.post("/api/auth/register", response_model=RegisterResponse, status_code=201)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> RegisterResponse:
     email = payload.email.lower().strip()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="Email already exists")
-    user = User(email=email, full_name=payload.full_name.strip(), password_hash=hash_password(payload.password), role="contributor")
+    user = User(
+        email=email,
+        full_name=payload.full_name.strip(),
+        password_hash=hash_password(payload.password),
+        role="contributor",
+        is_active=False,
+    )
     db.add(user)
+    db.flush()
+    profile = Person(
+        name=payload.full_name.strip(),
+        role="Lab member",
+        group="Students",
+        email=email,
+        bio="",
+        research_interests=[],
+        is_visible=False,
+        created_by_id=user.id,
+        sort_order=(db.scalar(select(func.max(Person.sort_order))) or 0) + 1,
+    )
+    db.add(profile)
+    db.flush()
+    save_submission(
+        db,
+        user,
+        "person",
+        "create",
+        profile.id,
+        {
+            "name": payload.full_name.strip(),
+            "role": "Lab member",
+            "group": "Students",
+            "education_level": None,
+            "enrollment_year": None,
+            "destination": None,
+            "bio": "",
+            "research_interests": [],
+            "email": email,
+            "website_url": None,
+            "avatar_url": None,
+            "is_visible": False,
+        },
+        profile.name,
+        f"{profile.role} · {profile.group}",
+    )
     db.commit()
-    db.refresh(user)
-    return LoginResponse(token=create_access_token(user), user=UserOut.model_validate(user))
+    return RegisterResponse(status="pending", message="Registration submitted. An administrator must approve your account before you can sign in.")
 
 
 @app.get("/api/public/home", response_model=HomeOut)
@@ -194,9 +317,17 @@ def update_settings(payload: SettingsPayload, db: Session = Depends(get_db), _us
 
 @app.post("/api/admin/news", response_model=NewsOut)
 def create_news(payload: NewsPayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> NewsOut:
-    values = payload.model_dump(); values["date"] = values["date"] or date.today(); values["created_by_id"] = user.id
-    if user.role == "contributor": values["is_published"] = False
+    values = payload.model_dump()
+    values["date"] = values["date"] or date.today()
+    values["created_by_id"] = user.id
+    if user.role == "contributor":
+        values["is_published"] = False
     row = NewsItem(**values); db.add(row); db.commit(); db.refresh(row)
+    if user.role == "contributor":
+        submission_values = payload.model_dump(mode="json")
+        submission_values["date"] = values["date"].isoformat()
+        save_submission(db, user, "news", "create", row.id, submission_values, row.title, row.body)
+        db.commit()
     return NewsOut.model_validate(row)
 
 
@@ -214,14 +345,29 @@ def update_news(news_id: int, payload: NewsPayload, db: Session = Depends(get_db
     row = db.get(NewsItem, news_id)
     if not row:
         raise HTTPException(status_code=404, detail="News item not found")
-    can_edit_own_draft = user.role == "contributor" and row.created_by_id == user.id and not row.is_published
-    if user.role != "admin" and not can_edit_own_draft:
-        raise HTTPException(status_code=403, detail="Only admins can publish news")
+    can_edit_own_content = user.role == "contributor" and row.created_by_id == user.id
+    if user.role != "admin" and not can_edit_own_content:
+        raise HTTPException(status_code=403, detail="You can only edit your own news submissions")
     values = payload.model_dump()
     if user.role == "contributor":
+        submission_values = payload.model_dump(mode="json")
+        submission_values["date"] = (values["date"] or row.date).isoformat()
+        if row.is_published:
+            save_submission(db, user, "news", "update", row.id, submission_values, payload.title, payload.body)
+            db.commit()
+            db.refresh(row)
+            return NewsOut.model_validate(row)
         values["is_published"] = False
     for key, value in values.items():
         setattr(row, key, value)
+    if user.role == "admin":
+        sync_values = payload.model_dump(mode="json")
+        sync_values["date"] = (values["date"] or row.date).isoformat()
+        sync_pending_submission(db, "news", row.id, sync_values, row.title, row.body)
+    else:
+        submission_values = payload.model_dump(mode="json")
+        submission_values["date"] = (values["date"] or row.date).isoformat()
+        save_submission(db, user, "news", "create", row.id, submission_values, row.title, row.body)
     db.commit()
     db.refresh(row)
     return NewsOut.model_validate(row)
@@ -243,6 +389,18 @@ def create_publication(payload: PublicationPayload, db: Session = Depends(get_db
     elif values["is_published"]: values["status"] = "Published"
     elif values["status"] == "Published": values["status"] = "Pending review"
     row = Publication(**values); db.add(row); db.commit(); db.refresh(row)
+    if user.role == "contributor":
+        save_submission(
+            db,
+            user,
+            "publication",
+            "create",
+            row.id,
+            payload.model_dump(mode="json") | {"status": "Pending review", "is_published": False, "featured": False},
+            row.title,
+            f"{row.authors} · {row.venue} · {row.year}",
+        )
+        db.commit()
     return PublicationOut.model_validate(row)
 
 
@@ -260,16 +418,50 @@ def update_publication(publication_id: int, payload: PublicationPayload, db: Ses
     row = db.get(Publication, publication_id)
     if not row:
         raise HTTPException(status_code=404, detail="Publication not found")
-    can_edit_own_draft = user.role == "contributor" and row.created_by_id == user.id and not row.is_published
-    if user.role != "admin" and not can_edit_own_draft:
-        raise HTTPException(status_code=403, detail="Only admins can publish publications")
+    can_edit_own_content = user.role == "contributor" and row.created_by_id == user.id
+    if user.role != "admin" and not can_edit_own_content:
+        raise HTTPException(status_code=403, detail="You can only edit your own publication submissions")
     values = payload.model_dump()
     if user.role == "contributor":
+        if row.is_published:
+            save_submission(
+                db,
+                user,
+                "publication",
+                "update",
+                row.id,
+                payload.model_dump(mode="json") | {"status": "Pending review", "is_published": False, "featured": False},
+                payload.title,
+                f"{payload.authors} · {payload.venue} · {payload.year}",
+            )
+            db.commit()
+            db.refresh(row)
+            return AdminPublicationOut.model_validate(row)
         values.update(status="Pending review", is_published=False, featured=False)
     elif values["is_published"]: values["status"] = "Published"
     elif values["status"] == "Published": values["status"] = "Pending review"
     for key, value in values.items():
         setattr(row, key, value)
+    if user.role == "admin":
+        sync_pending_submission(
+            db,
+            "publication",
+            row.id,
+            payload.model_dump(mode="json"),
+            row.title,
+            f"{row.authors} · {row.venue} · {row.year}",
+        )
+    else:
+        save_submission(
+            db,
+            user,
+            "publication",
+            "create",
+            row.id,
+            payload.model_dump(mode="json") | {"status": "Pending review", "is_published": False, "featured": False},
+            row.title,
+            f"{row.authors} · {row.venue} · {row.year}",
+        )
     db.commit()
     db.refresh(row)
     return AdminPublicationOut.model_validate(row)
@@ -413,6 +605,20 @@ def upsert_my_profile(payload: PersonPayload, db: Session = Depends(get_db), use
     if user.role == "contributor":
         values["is_visible"] = False
     if row:
+        if user.role == "contributor" and row.is_visible:
+            save_submission(
+                db,
+                user,
+                "person",
+                "update",
+                row.id,
+                payload.model_dump(mode="json") | {"email": user.email, "is_visible": False},
+                payload.name,
+                f"{payload.role} · {payload.group}",
+            )
+            db.commit()
+            db.refresh(row)
+            return admin_person_response(row, db)
         if row.created_by_id is None:
             row.created_by_id = user.id
         for key, value in values.items():
@@ -422,6 +628,20 @@ def upsert_my_profile(payload: PersonPayload, db: Session = Depends(get_db), use
         values["sort_order"] = (db.scalar(select(func.max(Person.sort_order))) or 0) + 1
         row = Person(**values)
         db.add(row)
+        db.flush()
+    if user.role == "contributor":
+        save_submission(
+            db,
+            user,
+            "person",
+            "create",
+            row.id,
+            payload.model_dump(mode="json") | {"email": user.email, "is_visible": False},
+            row.name,
+            f"{row.role} · {row.group}",
+        )
+    else:
+        sync_pending_submission(db, "person", row.id, payload.model_dump(mode="json"), row.name, f"{row.role} · {row.group}")
     db.commit()
     db.refresh(row)
     return admin_person_response(row, db)
@@ -449,11 +669,38 @@ def update_person(person_id: int, payload: PersonPayload, db: Session = Depends(
     if user.role != "admin" and not can_edit_own_profile:
         raise HTTPException(status_code=403, detail="Only admins can update published profiles")
     values = payload.model_dump()
+    if user.role == "contributor" and row.is_visible:
+        save_submission(
+            db,
+            user,
+            "person",
+            "update",
+            row.id,
+            payload.model_dump(mode="json") | {"email": user.email, "is_visible": False},
+            payload.name,
+            f"{payload.role} · {payload.group}",
+        )
+        db.commit()
+        db.refresh(row)
+        return admin_person_response(row, db)
     if user.role == "contributor":
         values["is_visible"] = False
         values["email"] = user.email
     for key, value in values.items():
         setattr(row, key, value)
+    if user.role == "admin":
+        sync_pending_submission(db, "person", row.id, payload.model_dump(mode="json"), row.name, f"{row.role} · {row.group}")
+    else:
+        save_submission(
+            db,
+            user,
+            "person",
+            "create",
+            row.id,
+            payload.model_dump(mode="json") | {"email": user.email, "is_visible": False},
+            row.name,
+            f"{row.role} · {row.group}",
+        )
     db.commit(); db.refresh(row)
     return admin_person_response(row, db)
 
@@ -490,20 +737,173 @@ def update_person_account_role(person_id: int, payload: AccountRolePayload, db: 
     return admin_person_response(row, db)
 
 
+def apply_submission_payload(submission: Submission, db: Session, *, publish: bool) -> int:
+    payload = dict(submission.payload or {})
+    if submission.content_id is None:
+        raise HTTPException(status_code=400, detail="Submission is missing its content record")
+    if submission.content_type == "news":
+        row = db.get(NewsItem, submission.content_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="News item not found")
+        if isinstance(payload.get("date"), str):
+            payload["date"] = date.fromisoformat(payload["date"])
+        for key in ("date", "title", "body", "href", "tag"):
+            if key in payload:
+                setattr(row, key, payload[key])
+        if publish:
+            row.is_published = True
+        return row.id
+    if submission.content_type == "publication":
+        row = db.get(Publication, submission.content_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Publication not found")
+        for key in ("title", "authors", "venue", "venue_short", "year", "type", "abstract", "paper_url", "pdf_url", "code_url", "video_url", "thumbnail_url"):
+            if key in payload:
+                setattr(row, key, payload[key])
+        if publish:
+            row.status = "Published"
+            row.is_published = True
+        return row.id
+    if submission.content_type == "person":
+        row = db.get(Person, submission.content_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Person not found")
+        for key in ("name", "role", "group", "education_level", "enrollment_year", "destination", "bio", "research_interests", "email", "website_url", "avatar_url"):
+            if key in payload:
+                setattr(row, key, payload[key])
+        if publish:
+            row.is_visible = True
+        return row.id
+    raise HTTPException(status_code=400, detail="Unsupported review content type")
+
+
+def approve_submission(submission: Submission, db: Session, reviewer: User) -> ReviewActionOut:
+    content_id = apply_submission_payload(submission, db, publish=True)
+    submission.status = "approved"
+    submission.reviewed_at = now_utc()
+    submission.reviewed_by_id = reviewer.id
+    db.commit()
+    return ReviewActionOut(id=content_id, content_type=submission.content_type, status="approved")
+
+
+def reject_submission(submission: Submission, db: Session, reviewer: User) -> ReviewActionOut:
+    content_id = submission.content_id or 0
+    if submission.action == "create" and submission.content_id is not None:
+        if submission.content_type == "news":
+            row = db.get(NewsItem, submission.content_id)
+        elif submission.content_type == "publication":
+            row = db.get(Publication, submission.content_id)
+        else:
+            row = db.get(Person, submission.content_id)
+        if row:
+            db.delete(row)
+    submission.status = "rejected"
+    submission.reviewed_at = now_utc()
+    submission.reviewed_by_id = reviewer.id
+    db.commit()
+    return ReviewActionOut(id=content_id, content_type=submission.content_type, status="rejected")
+
+
 @app.get("/api/admin/review-queue", response_model=list[ReviewQueueItem])
 def list_review_queue(db: Session = Depends(get_db), _user: User = Depends(require_roles("admin"))) -> list[ReviewQueueItem]:
     items: list[ReviewQueueItem] = []
+    pending_submissions = db.scalars(select(Submission).where(Submission.status == "pending").order_by(Submission.created_at.desc(), Submission.id.desc())).all()
+    pending_keys = {(row.content_type, row.content_id) for row in pending_submissions}
+    for row in pending_submissions:
+        items.append(ReviewQueueItem(
+            id=row.content_id or row.id,
+            content_type=row.content_type,
+            title=row.title,
+            summary=row.summary,
+            status="Pending review",
+            created_by_id=row.submitted_by_id,
+            created_at=row.created_at,
+            submission_id=row.id,
+            action=row.action,
+        ))
     for row in db.scalars(select(NewsItem).where(NewsItem.is_published.is_(False)).order_by(NewsItem.date.desc(), NewsItem.id.desc())).all():
-        items.append(ReviewQueueItem(id=row.id, content_type="news", title=row.title, summary=row.body, status="Pending review", created_by_id=row.created_by_id))
+        if ("news", row.id) not in pending_keys:
+            items.append(ReviewQueueItem(id=row.id, content_type="news", title=row.title, summary=row.body, status="Pending review", created_by_id=row.created_by_id, action="create"))
     for row in db.scalars(select(Publication).where((Publication.is_published.is_(False)) | (Publication.status == "Draft")).order_by(Publication.year.desc(), Publication.id.desc())).all():
-        items.append(ReviewQueueItem(id=row.id, content_type="publication", title=row.title, summary=f"{row.authors} · {row.venue} · {row.year}", status="Pending review", created_by_id=row.created_by_id))
+        if ("publication", row.id) not in pending_keys:
+            items.append(ReviewQueueItem(id=row.id, content_type="publication", title=row.title, summary=f"{row.authors} · {row.venue} · {row.year}", status="Pending review", created_by_id=row.created_by_id, action="create"))
     for row in db.scalars(select(Person).where(Person.is_visible.is_(False)).order_by(Person.id.desc())).all():
-        items.append(ReviewQueueItem(id=row.id, content_type="person", title=row.name, summary=f"{row.role} · {row.group}", status="Pending review", created_by_id=row.created_by_id))
+        if ("person", row.id) not in pending_keys:
+            items.append(ReviewQueueItem(id=row.id, content_type="person", title=row.name, summary=f"{row.role} · {row.group}", status="Pending review", created_by_id=row.created_by_id, action="create"))
     return items
 
 
+@app.post("/api/admin/submissions/{submission_id}/approve", response_model=ReviewActionOut)
+def approve_submission_route(submission_id: int, db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))) -> ReviewActionOut:
+    submission = db.get(Submission, submission_id)
+    if not submission or submission.status != "pending":
+        raise HTTPException(status_code=404, detail="Pending submission not found")
+    return approve_submission(submission, db, user)
+
+
+@app.post("/api/admin/submissions/{submission_id}/reject", response_model=ReviewActionOut)
+def reject_submission_route(submission_id: int, db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))) -> ReviewActionOut:
+    submission = db.get(Submission, submission_id)
+    if not submission or submission.status != "pending":
+        raise HTTPException(status_code=404, detail="Pending submission not found")
+    return reject_submission(submission, db, user)
+
+
+@app.get("/api/admin/my-submissions", response_model=list[SubmissionOut])
+def list_my_submissions(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> list[SubmissionOut]:
+    rows = db.scalars(
+        select(Submission)
+        .where(Submission.submitted_by_id == user.id, Submission.status != "cleared")
+        .order_by(Submission.created_at.desc(), Submission.id.desc())
+    ).all()
+    return [submission_out(row) for row in rows]
+
+
+@app.post("/api/admin/submissions/{submission_id}/withdraw", response_model=ReviewActionOut)
+def withdraw_submission(submission_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> ReviewActionOut:
+    submission = db.get(Submission, submission_id)
+    if not submission or submission.submitted_by_id != user.id:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if submission.status != "pending":
+        raise HTTPException(status_code=400, detail="Only pending submissions can be withdrawn")
+    content_id = submission.content_id or 0
+    if submission.action == "create" and submission.content_id is not None:
+        if submission.content_type == "news":
+            row = db.get(NewsItem, submission.content_id)
+        elif submission.content_type == "publication":
+            row = db.get(Publication, submission.content_id)
+        else:
+            row = db.get(Person, submission.content_id)
+        if row:
+            db.delete(row)
+    submission.status = "withdrawn"
+    submission.reviewed_at = now_utc()
+    db.commit()
+    return ReviewActionOut(id=content_id, content_type=submission.content_type, status="withdrawn")
+
+
+@app.post("/api/admin/submissions/{submission_id}/clear", response_model=ReviewActionOut)
+def clear_submission(submission_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> ReviewActionOut:
+    submission = db.get(Submission, submission_id)
+    if not submission or submission.submitted_by_id != user.id:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if submission.status not in {"approved", "rejected", "withdrawn"}:
+        raise HTTPException(status_code=400, detail="Only resolved submissions can be cleared")
+    submission.status = "cleared"
+    submission.cleared_at = now_utc()
+    db.commit()
+    return ReviewActionOut(id=submission.content_id or 0, content_type=submission.content_type, status="cleared")
+
+
 @app.post("/api/admin/review-queue/{content_type}/{content_id}/publish", response_model=ReviewActionOut)
-def publish_review_item(content_type: str, content_id: int, db: Session = Depends(get_db), _user: User = Depends(require_roles("admin"))) -> ReviewActionOut:
+def publish_review_item(content_type: str, content_id: int, db: Session = Depends(get_db), user: User = Depends(require_roles("admin"))) -> ReviewActionOut:
+    submission = db.scalar(
+        select(Submission)
+        .where(Submission.content_type == content_type, Submission.content_id == content_id, Submission.status == "pending")
+        .order_by(Submission.id.desc())
+    )
+    if submission:
+        return approve_submission(submission, db, user)
     if content_type == "news":
         row = db.get(NewsItem, content_id)
         if not row:
