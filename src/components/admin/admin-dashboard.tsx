@@ -2093,7 +2093,9 @@ function ReviewQueuePanel({
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
       <div className="mb-[14px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem]">
         <h2>Review queue</h2>
-        <span className="inline-flex items-center rounded-full bg-[#fff4dc] px-2 py-1 text-[0.7rem] font-bold text-[#8a5a00]">
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${items.length ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
+        >
           {items.length} pending
         </span>
       </div>
