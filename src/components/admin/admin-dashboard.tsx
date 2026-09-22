@@ -83,6 +83,20 @@ type AdminUser = Session["user"] & { is_active: boolean };
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
 
+const quickActionPrimaryClass =
+  "inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]";
+const quickActionSecondaryClass =
+  "inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]";
+
+function quickActionClass(
+  action: QuickAction,
+  selectedAction: QuickAction | null,
+) {
+  return selectedAction === action || (!selectedAction && action === "news")
+    ? quickActionPrimaryClass
+    : quickActionSecondaryClass;
+}
+
 function formatRunningTime(startedAt?: string | null, now?: Date | null) {
   if (!startedAt || !now) return "Starting…";
   const start = new Date(startedAt);
@@ -362,6 +376,7 @@ export function AdminDashboard({
                     accountRole={session.user.role}
                     onChanged={handleReviewChange}
                     onQuickAction={setQuickAction}
+                    quickAction={quickAction}
                   />
                 ) : null}
                 {view === "settings" ? (
@@ -761,12 +776,14 @@ function Overview({
   accountRole,
   onChanged,
   onQuickAction,
+  quickAction,
 }: {
   snapshot: SiteSnapshot;
   token: string;
   accountRole: UserRole;
   onChanged: (item: ReviewQueueItem, action: "publish" | "delete") => void;
   onQuickAction: (action: QuickAction) => void;
+  quickAction: QuickAction | null;
 }) {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -814,32 +831,36 @@ function Overview({
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
+            className={quickActionClass("news", quickAction)}
             type="button"
             onClick={() => onQuickAction("news")}
+            aria-pressed={quickAction === "news"}
           >
             <Newspaper size={15} /> Add news
           </button>
           <button
-            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+            className={quickActionClass("publication", quickAction)}
             type="button"
             onClick={() => onQuickAction("publication")}
+            aria-pressed={quickAction === "publication"}
           >
             <Upload size={15} /> Add publication
           </button>
           {accountRole === "admin" ? (
             <>
               <button
-                className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                className={quickActionClass("profile", quickAction)}
                 type="button"
                 onClick={() => onQuickAction("profile")}
+                aria-pressed={quickAction === "profile"}
               >
                 <UserRound size={15} /> Add profile
               </button>
               <button
-                className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                className={quickActionClass("account", quickAction)}
                 type="button"
                 onClick={() => onQuickAction("account")}
+                aria-pressed={quickAction === "account"}
               >
                 <Users size={15} /> Add user
               </button>
