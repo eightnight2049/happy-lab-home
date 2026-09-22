@@ -1137,6 +1137,10 @@ function NewsPanel({
   const [editingId, setEditingId] = useState<number | null>(
     initialEditId ?? null,
   );
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(
+    null,
+  );
   const [query, setQuery] = useState("");
   const [yearFilter, setYearFilter] = useState("all");
   const editingItem = editingId
@@ -1177,15 +1181,19 @@ function NewsPanel({
     (item.is_published === false && item.created_by_id === currentUserId);
 
   async function deleteItem(item: NewsItem) {
-    if (!window.confirm(`Delete “${item.title}”? This cannot be undone.`))
-      return;
-    const response = await fetch(`${apiBase}/api/admin/news/${item.id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) return;
-    onChanged(items.filter((entry) => entry.id !== item.id));
-    if (editingId === item.id) setEditingId(null);
+    setDeletingId(item.id);
+    try {
+      const response = await fetch(`${apiBase}/api/admin/news/${item.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+      onChanged(items.filter((entry) => entry.id !== item.id));
+      if (editingId === item.id) setEditingId(null);
+    } finally {
+      setDeletingId(null);
+      setConfirmingDeleteId(null);
+    }
   }
 
   return (
@@ -1288,13 +1296,35 @@ function NewsPanel({
                   </button>
                 ) : null}
                 {accountRole === "admin" ? (
-                  <button
-                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
-                    type="button"
-                    onClick={() => void deleteItem(item)}
-                  >
-                    <Trash2 size={14} /> Delete
-                  </button>
+                  confirmingDeleteId === item.id ? (
+                    <>
+                      <button
+                        className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white"
+                        type="button"
+                        disabled={deletingId === item.id}
+                        onClick={() => void deleteItem(item)}
+                      >
+                        <Trash2 size={14} />
+                        {deletingId === item.id ? "Deleting…" : "Confirm delete"}
+                      </button>
+                      <button
+                        className="inline-flex min-h-[42px] items-center justify-center rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)]"
+                        type="button"
+                        disabled={deletingId === item.id}
+                        onClick={() => setConfirmingDeleteId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
+                      type="button"
+                      onClick={() => setConfirmingDeleteId(item.id)}
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  )
                 ) : null}
               </div>
             </div>
@@ -1479,6 +1509,10 @@ function PublicationsPanel({
   const [editingId, setEditingId] = useState<number | null>(
     initialEditId ?? null,
   );
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(
+    null,
+  );
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [yearFilter, setYearFilter] = useState("All");
@@ -1518,15 +1552,19 @@ function PublicationsPanel({
     (item.is_published === false && item.created_by_id === currentUserId);
 
   async function deleteItem(item: Publication) {
-    if (!window.confirm(`Delete “${item.title}”? This cannot be undone.`))
-      return;
-    const response = await fetch(
-      `${apiBase}/api/admin/publications/${item.id}`,
-      { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
-    );
-    if (!response.ok) return;
-    onChanged(items.filter((entry) => entry.id !== item.id));
-    if (editingId === item.id) setEditingId(null);
+    setDeletingId(item.id);
+    try {
+      const response = await fetch(
+        `${apiBase}/api/admin/publications/${item.id}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!response.ok) return;
+      onChanged(items.filter((entry) => entry.id !== item.id));
+      if (editingId === item.id) setEditingId(null);
+    } finally {
+      setDeletingId(null);
+      setConfirmingDeleteId(null);
+    }
   }
 
   return (
@@ -1644,13 +1682,35 @@ function PublicationsPanel({
                   </button>
                 ) : null}
                 {accountRole === "admin" ? (
-                  <button
-                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
-                    type="button"
-                    onClick={() => void deleteItem(item)}
-                  >
-                    <Trash2 size={14} /> Delete
-                  </button>
+                  confirmingDeleteId === item.id ? (
+                    <>
+                      <button
+                        className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white"
+                        type="button"
+                        disabled={deletingId === item.id}
+                        onClick={() => void deleteItem(item)}
+                      >
+                        <Trash2 size={14} />
+                        {deletingId === item.id ? "Deleting…" : "Confirm delete"}
+                      </button>
+                      <button
+                        className="inline-flex min-h-[42px] items-center justify-center rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)]"
+                        type="button"
+                        disabled={deletingId === item.id}
+                        onClick={() => setConfirmingDeleteId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
+                      type="button"
+                      onClick={() => setConfirmingDeleteId(item.id)}
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  )
                 ) : null}
               </div>
             </div>
@@ -3255,6 +3315,9 @@ function UsersPanel({
   const [message, setMessage] = useState("");
   const [usersError, setUsersError] = useState("");
   const [savingUserId, setSavingUserId] = useState<number | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(
+    null,
+  );
   const [loadingUsers, setLoadingUsers] = useState(true);
   const adminCount = users.filter((user) => user.role === "admin").length;
 
@@ -3326,10 +3389,6 @@ function UsersPanel({
   }
 
   async function deleteUser(user: AdminUser) {
-    if (
-      !window.confirm(`Delete the account for ${user.full_name || user.email}?`)
-    )
-      return;
     setSavingUserId(user.id);
     setMessage("");
     try {
@@ -3353,6 +3412,7 @@ function UsersPanel({
       );
     } finally {
       setSavingUserId(null);
+      setConfirmingDeleteId(null);
     }
   }
 
@@ -3433,17 +3493,40 @@ function UsersPanel({
                   <option value="contributor">User</option>
                   <option value="admin">Admin</option>
                 </select>
-                <button
-                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
-                  type="button"
-                  disabled={
-                    savingUserId === user.id || user.id === currentUserId
-                  }
-                  onClick={() => void deleteUser(user)}
-                >
-                  <Trash2 size={14} />
-                  {savingUserId === user.id ? "Deleting…" : "Delete"}
-                </button>
+                {confirmingDeleteId === user.id ? (
+                  <>
+                    <button
+                      className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white"
+                      type="button"
+                      disabled={savingUserId === user.id}
+                      onClick={() => void deleteUser(user)}
+                    >
+                      <Trash2 size={14} />
+                      {savingUserId === user.id
+                        ? "Deleting…"
+                        : "Confirm delete"}
+                    </button>
+                    <button
+                      className="inline-flex min-h-[42px] items-center justify-center rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)]"
+                      type="button"
+                      disabled={savingUserId === user.id}
+                      onClick={() => setConfirmingDeleteId(null)}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
+                    type="button"
+                    disabled={
+                      savingUserId === user.id || user.id === currentUserId
+                    }
+                    onClick={() => setConfirmingDeleteId(user.id)}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                )}
               </div>
             </div>
           ))
