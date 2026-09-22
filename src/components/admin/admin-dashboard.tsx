@@ -246,14 +246,14 @@ export function AdminDashboard({
   }, [session]);
 
   useEffect(() => {
-    if (session?.user.role === "admin") return;
+    if (!isSessionLoaded || !session || session.user.role === "admin") return;
     if (view !== "settings" && view !== "users") return;
     const timer = window.setTimeout(() => {
       setView("overview");
       router.replace("/studio");
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [router, session?.user.role, view]);
+  }, [isSessionLoaded, router, session, view]);
 
   function onLogin(next: Session) {
     setSnapshotLoaded(false);
