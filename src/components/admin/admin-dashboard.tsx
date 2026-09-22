@@ -124,6 +124,16 @@ function formatTimestamp(value?: string | null) {
   }).format(date);
 }
 
+function reviewSummary(
+  contentType: ReviewQueueItem["content_type"],
+  summary: string,
+) {
+  if (contentType === "publication" || contentType === "person") {
+    return summary.split(" · ")[0] || summary;
+  }
+  return summary;
+}
+
 function normalizeSession(session: Session): Session {
   return {
     ...session,
@@ -2168,6 +2178,12 @@ function MyReviewQueuePanel({ token }: { token: string }) {
               <strong className="mt-1 block overflow-hidden text-[0.9rem] text-ellipsis whitespace-nowrap">
                 {item.title}
               </strong>
+              <span
+                className="mt-0.5 block overflow-hidden text-[0.76rem] text-ellipsis whitespace-nowrap text-[var(--slate)]"
+                title={reviewSummary(item.content_type, item.summary)}
+              >
+                {reviewSummary(item.content_type, item.summary)}
+              </span>
               <span className="mt-1 block text-[0.72rem] text-[var(--slate-light)]">
                 Submitted {formatTimestamp(item.created_at)}
                 {item.reviewed_at ? ` · Updated ${formatTimestamp(item.reviewed_at)}` : ""}
@@ -2374,6 +2390,9 @@ function ReviewQueuePanel({
                   {contentLabels[item.content_type]}
                 </span>
                 <strong>{item.title}</strong>
+                <span title={reviewSummary(item.content_type, item.summary)}>
+                  {reviewSummary(item.content_type, item.summary)}
+                </span>
                 <span className="mt-1 block text-[0.7rem] text-[var(--slate-light)]">
                   {item.submitted_by_name ? `By ${item.submitted_by_name} · ` : ""}
                   Submitted {formatTimestamp(item.created_at)}
