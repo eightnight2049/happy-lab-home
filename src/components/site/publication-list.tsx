@@ -13,6 +13,8 @@ import { useMemo, useState } from "react";
 import type { Publication } from "@/lib/types";
 
 const filters = ["All", "Conference", "Journal", "Preprint"];
+const actionClass =
+  "inline-flex items-center gap-1 rounded-[4px] border border-[var(--ink)] bg-[var(--ink)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:bg-black";
 
 export function PublicationList({ items }: { items: Publication[] }) {
   const [query, setQuery] = useState("");
@@ -171,7 +173,7 @@ function PublicationRow({ item }: { item: Publication }) {
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {available(item.paper_url) ? (
             <a
-              className="inline-flex items-center gap-1 rounded-[4px] border border-[var(--ink)] bg-[var(--ink)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:bg-black"
+              className={actionClass}
               href={item.paper_url ?? undefined}
             >
               <House size={13} /> Home
@@ -179,7 +181,7 @@ function PublicationRow({ item }: { item: Publication }) {
           ) : null}
           {available(item.code_url) ? (
             <a
-              className="inline-flex items-center gap-1 rounded-[4px] border border-[var(--ink)] bg-[var(--ink)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:bg-black"
+              className={actionClass}
               href={item.code_url ?? undefined}
             >
               <Code2 size={13} /> Code
@@ -187,7 +189,7 @@ function PublicationRow({ item }: { item: Publication }) {
           ) : null}
           {available(item.video_url) ? (
             <a
-              className="inline-flex items-center gap-1 rounded-[4px] border border-[var(--line)] bg-white px-[11px] py-[5px] text-[0.86rem] font-medium text-[var(--ink-soft)] hover:border-[var(--ink-soft)] hover:bg-[var(--bg-muted)] hover:text-[var(--ink)]"
+              className={actionClass}
               href={item.video_url ?? undefined}
             >
               <Play size={13} /> Video
