@@ -16,6 +16,7 @@ export const fallbackSnapshot: SiteSnapshot = {
     google_scholar_url: "https://scholar.google.com/",
     github_url: "https://github.com/",
   },
+  account_count: 0,
   news: [
     {
       id: 1,

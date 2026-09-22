@@ -83,6 +83,19 @@ type AdminUser = Session["user"] & { is_active: boolean };
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
 
+function formatRunningTime(startedAt?: string | null, now?: Date | null) {
+  if (!startedAt || !now) return "Starting…";
+  const start = new Date(startedAt);
+  if (Number.isNaN(start.getTime()) || start.getTime() > now.getTime())
+    return "Starting…";
+  const elapsedSeconds = Math.floor((now.getTime() - start.getTime()) / 1000);
+  const days = Math.floor(elapsedSeconds / 86_400);
+  const hours = Math.floor((elapsedSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((elapsedSeconds % 3_600) / 60);
+  const seconds = elapsedSeconds % 60;
+  return `${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
+
 function normalizeSession(session: Session): Session {
   return {
     ...session,
@@ -160,6 +173,14 @@ export function AdminDashboard({
         });
         if (peopleResponse.ok)
           nextSnapshot.people = (await peopleResponse.json()) as Person[];
+        const usersResponse = await fetch(`${apiBase}/api/admin/users`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (usersResponse.ok)
+          nextSnapshot.account_count = (
+            (await usersResponse.json()) as AdminUser[]
+          ).length;
       }
       setSnapshot(nextSnapshot);
       setSnapshotLoaded(true);
@@ -750,6 +771,16 @@ function Overview({
   onChanged: (item: ReviewQueueItem, action: "publish" | "delete") => void;
   onQuickAction: (action: QuickAction) => void;
 }) {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    const initialTimer = window.setTimeout(() => setNow(new Date()), 0);
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const publishedNewsCount = snapshot.news.filter(
     (item) => item.is_published !== false,
   ).length;
@@ -757,12 +788,16 @@ function Overview({
     { label: "Published news", value: publishedNewsCount },
     { label: "Publications", value: snapshot.publications.length },
     { label: "People", value: snapshot.people.length },
-    { label: "Research areas", value: snapshot.research.length },
+    { label: "Accounts", value: snapshot.account_count ?? 0 },
+    {
+      label: "Lab runtime",
+      value: formatRunningTime(snapshot.settings.started_at, now),
+    },
     { label: "Total visits", value: snapshot.settings.visit_count ?? 0 },
   ];
   return (
     <>
-      <div className="mb-[26px] grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[14px] max-[980px]:grid-cols-2">
+      <div className="mb-[26px] grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-[14px] max-[980px]:grid-cols-2">
         {cards.map((card) => (
           <div
             className="rounded-[10px] border border-[#e0e0dc] bg-white p-[18px]"

@@ -95,6 +95,7 @@ export interface FeedbackItem {
 
 export interface SiteSnapshot {
   settings: LabSettings;
+  account_count?: number;
   news: NewsItem[];
   research: ResearchArea[];
   people: Person[];
