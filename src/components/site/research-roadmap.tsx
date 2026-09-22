@@ -66,7 +66,7 @@ export function ResearchRoadmap() {
       >
         {thrusts.map((item, index) => (
           <button
-            className={`grid min-h-[158px] gap-[5px] border-0 border-r border-[var(--line)] bg-transparent p-[18px] text-left text-[var(--ink)] last:border-r-0 min-[981px]:last:border-r-0 max-[700px]:min-h-0 max-[700px]:border-b max-[700px]:border-r-0 max-[700px]:border-[#9e8585] max-[700px]:last:border-b-0 ${active === index ? "bg-[var(--accent-deep)] text-white" : ""}`}
+            className={`grid min-h-[158px] gap-[5px] border-0 border-r border-[var(--line)] p-[18px] text-left last:border-r-0 min-[981px]:last:border-r-0 max-[700px]:min-h-0 max-[700px]:border-b max-[700px]:border-r-0 max-[700px]:border-[#9e8585] max-[700px]:last:border-b-0 ${active === index ? "bg-[var(--accent-deep)] text-white" : "bg-transparent text-[var(--ink)]"}`}
             type="button"
             key={item.number}
             onClick={() => setActive(index)}
