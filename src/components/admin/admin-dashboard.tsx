@@ -150,6 +150,8 @@ export function AdminDashboard({
   const [snapshotError, setSnapshotError] = useState("");
   const [message, setMessage] = useState("");
   const [quickAction, setQuickAction] = useState<QuickAction | null>(null);
+  const [selectedQuickAction, setSelectedQuickAction] =
+    useState<QuickAction>("news");
 
   async function refreshSnapshot(token?: string) {
     setSnapshotLoaded(false);
@@ -375,8 +377,11 @@ export function AdminDashboard({
                     token={session.token}
                     accountRole={session.user.role}
                     onChanged={handleReviewChange}
-                    onQuickAction={setQuickAction}
-                    quickAction={quickAction}
+                    onQuickAction={(action) => {
+                      setSelectedQuickAction(action);
+                      setQuickAction(action);
+                    }}
+                    quickAction={selectedQuickAction}
                   />
                 ) : null}
                 {view === "settings" ? (
