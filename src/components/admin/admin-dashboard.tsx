@@ -426,6 +426,7 @@ export function AdminDashboard({
                     people={snapshot.people}
                     token={session.token}
                     accountRole={session.user.role}
+                    user={session.user}
                     onChanged={(people) =>
                       setSnapshot((current) => ({ ...current, people }))
                     }
@@ -1204,18 +1205,24 @@ function NewsPanel({
   return (
     <>
       {editingItem ? (
-        <NewsEditor
-          key={`news-editor-${editingItem.id}`}
-          item={editingItem}
-          token={token}
-          accountRole={accountRole}
-          onCancel={() => setEditingId(null)}
-          onSaved={(saved) =>
-            onChanged(
-              items.map((item) => (item.id === saved.id ? saved : item)),
-            )
-          }
-        />
+        <QuickActionDialog
+          title="Edit news"
+          onClose={() => setEditingId(null)}
+        >
+          <NewsEditor
+            key={`news-editor-${editingItem.id}`}
+            item={editingItem}
+            token={token}
+            accountRole={accountRole}
+            showHeader={false}
+            onCancel={() => setEditingId(null)}
+            onSaved={(saved) =>
+              onChanged(
+                items.map((item) => (item.id === saved.id ? saved : item)),
+              )
+            }
+          />
+        </QuickActionDialog>
       ) : null}
       <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
         <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
@@ -1349,12 +1356,14 @@ function NewsEditor({
   item,
   token,
   accountRole,
+  showHeader = true,
   onCancel,
   onSaved,
 }: {
   item: NewsItem | null;
   token: string;
   accountRole: UserRole;
+  showHeader?: boolean;
   onCancel: () => void;
   onSaved: (item: NewsItem) => void;
 }) {
@@ -1427,7 +1436,7 @@ function NewsEditor({
 
   return (
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-      {item ? (
+      {item && showHeader ? (
         <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Edit news</h2>
@@ -1575,18 +1584,24 @@ function PublicationsPanel({
   return (
     <>
       {editingItem ? (
-        <PublicationEditor
-          key={`publication-editor-${editingItem.id}`}
-          item={editingItem}
-          token={token}
-          accountRole={accountRole}
-          onCancel={() => setEditingId(null)}
-          onSaved={(saved) =>
-            onChanged(
-              items.map((item) => (item.id === saved.id ? saved : item)),
-            )
-          }
-        />
+        <QuickActionDialog
+          title="Edit publication"
+          onClose={() => setEditingId(null)}
+        >
+          <PublicationEditor
+            key={`publication-editor-${editingItem.id}`}
+            item={editingItem}
+            token={token}
+            accountRole={accountRole}
+            showHeader={false}
+            onCancel={() => setEditingId(null)}
+            onSaved={(saved) =>
+              onChanged(
+                items.map((item) => (item.id === saved.id ? saved : item)),
+              )
+            }
+          />
+        </QuickActionDialog>
       ) : null}
       <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
         <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
@@ -1735,12 +1750,14 @@ function PublicationEditor({
   item,
   token,
   accountRole,
+  showHeader = true,
   onCancel,
   onSaved,
 }: {
   item: Publication | null;
   token: string;
   accountRole: UserRole;
+  showHeader?: boolean;
   onCancel: () => void;
   onSaved: (item: Publication) => void;
 }) {
@@ -1865,7 +1882,7 @@ function PublicationEditor({
 
   return (
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-      {item ? (
+      {item && showHeader ? (
         <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
           <div>
             <h2>Edit publication</h2>
@@ -2208,13 +2225,16 @@ function PeoplePanel({
   people,
   token,
   accountRole,
+  user,
   onChanged,
 }: {
   people: Person[];
   token: string;
   accountRole: UserRole;
+  user: Session["user"];
   onChanged: (people: Person[]) => void;
 }) {
+  const [editingPersonId, setEditingPersonId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(
     null,
@@ -2239,6 +2259,7 @@ function PeoplePanel({
         throw new Error(detail?.detail ?? "Could not delete this profile.");
       }
       onChanged(people.filter((entry) => entry.id !== person.id));
+      if (editingPersonId === person.id) setEditingPersonId(null);
       setMessage(
         `${person.name}'s People profile was deleted. The account remains available.`,
       );
@@ -2316,9 +2337,31 @@ function PeoplePanel({
   const visibleCategories = peopleDirectoryCategories.filter(
     (category) => !hasQuery || (grouped.get(category.key)?.length ?? 0) > 0,
   );
+  const editingPerson = editingPersonId
+    ? (people.find((person) => person.id === editingPersonId) ?? null)
+    : null;
 
   return (
-    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+    <>
+      {editingPerson ? (
+        <QuickActionDialog
+          title={`Edit ${displayPersonName(editingPerson)}`}
+          onClose={() => setEditingPersonId(null)}
+        >
+          <ProfileEditor
+            key={`people-editor-${editingPerson.id}`}
+            profile={editingPerson}
+            people={people}
+            token={token}
+            user={user}
+            isEditingAnotherProfile
+            showHeader={false}
+            onChanged={onChanged}
+            onReturnToPeople={() => setEditingPersonId(null)}
+          />
+        </QuickActionDialog>
+      ) : null}
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
       <div className="mb-[14px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>People directory</h2>
@@ -2432,12 +2475,13 @@ function PeoplePanel({
                       </div>
                       <div className="mt-[14px] flex flex-wrap gap-1.5 [&>a]:min-h-8 [&>a]:flex-1 [&>a]:justify-center [&>a]:px-2 [&>a]:py-1.5 [&>a]:text-[0.7rem] [&>button]:min-h-8 [&>button]:flex-1 [&>button]:justify-center [&>button]:px-2 [&>button]:py-1.5 [&>button]:text-[0.7rem]">
                         {accountRole === "admin" ? (
-                          <Link
-                            className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-                            href={`/studio/profile?personId=${person.id}`}
-                          >
-                            <Pencil size={13} /> Edit
-                          </Link>
+                            <button
+                              className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                              type="button"
+                              onClick={() => setEditingPersonId(person.id)}
+                            >
+                              <Pencil size={13} /> Edit
+                            </button>
                         ) : null}
                         {accountRole === "admin" ? (
                           confirmingDeleteId === person.id ? (
@@ -2492,6 +2536,7 @@ function PeoplePanel({
           accountRole={accountRole}
           deletingId={deletingId}
           confirmingDeleteId={confirmingDeleteId}
+          onEdit={(person) => setEditingPersonId(person.id)}
           onDelete={deletePerson}
           onRequestDelete={(person) => setConfirmingDeleteId(person.id)}
           onCancelDelete={() => setConfirmingDeleteId(null)}
@@ -2508,6 +2553,7 @@ function PeoplePanel({
         </div>
       ) : null}
     </div>
+    </>
   );
 }
 
@@ -2518,6 +2564,7 @@ function AdminAlumniSection({
   accountRole,
   deletingId,
   confirmingDeleteId,
+  onEdit,
   onDelete,
   onRequestDelete,
   onCancelDelete,
@@ -2526,6 +2573,7 @@ function AdminAlumniSection({
   accountRole: UserRole;
   deletingId: number | null;
   confirmingDeleteId: number | null;
+  onEdit: (person: Person) => void;
   onDelete: (person: Person) => void | Promise<void>;
   onRequestDelete: (person: Person) => void;
   onCancelDelete: () => void;
@@ -2596,12 +2644,13 @@ function AdminAlumniSection({
                       </span>
                       {isAdmin ? (
                         <span className="flex flex-wrap gap-1.5 max-[700px]:col-span-2">
-                          <Link
+                          <button
                             className="inline-flex min-h-8 items-center justify-center gap-1 rounded-[6px] border border-[var(--line)] bg-white px-2 py-1 text-[0.7rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-                            href={`/studio/profile?personId=${person.id}`}
+                            type="button"
+                            onClick={() => onEdit(person)}
                           >
                             <Pencil size={12} /> Edit
-                          </Link>
+                          </button>
                           {confirmingDeleteId === person.id ? (
                             <>
                               <button
@@ -2776,6 +2825,7 @@ function ProfileEditor({
   token,
   user,
   isEditingAnotherProfile,
+  showHeader = true,
   onChanged,
   onReturnToPeople,
 }: {
@@ -2784,6 +2834,7 @@ function ProfileEditor({
   token: string;
   user: Session["user"];
   isEditingAnotherProfile: boolean;
+  showHeader?: boolean;
   onChanged: (people: Person[]) => void;
   onReturnToPeople: () => void;
 }) {
@@ -2919,7 +2970,8 @@ function ProfileEditor({
 
   return (
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
-      <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
+      {showHeader ? (
+        <div className="mb-[18px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem] [&_p]:m-0 [&_p]:text-[0.84rem] [&_p]:text-[var(--slate)]">
         <div>
           <h2>
             {isEditingAnotherProfile
@@ -2939,7 +2991,8 @@ function ProfileEditor({
         >
           {pending ? "Pending review" : profile ? "Published" : "New profile"}
         </span>
-      </div>
+        </div>
+      ) : null}
       {message ? (
         <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
           {message}
