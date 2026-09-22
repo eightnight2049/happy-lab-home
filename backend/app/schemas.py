@@ -152,6 +152,10 @@ class SubmissionOut(BaseModel):
     reviewed_at: datetime | None = None
 
 
+class SubmissionDetailOut(SubmissionOut):
+    payload: dict
+
+
 class AccountRolePayload(BaseModel):
     role: Literal["contributor", "admin"]
 

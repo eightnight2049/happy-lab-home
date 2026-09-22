@@ -41,6 +41,7 @@ import type {
   Publication,
   ReviewQueueItem,
   SiteSnapshot,
+  SubmissionDetail,
   SubmissionItem,
   UserRole,
 } from "@/lib/types";
@@ -425,6 +426,7 @@ export function AdminDashboard({
                   <Overview
                     snapshot={snapshot}
                     token={session.token}
+                    user={session.user}
                     accountRole={session.user.role}
                     onChanged={handleReviewChange}
                     onQuickAction={(action) => {
@@ -833,6 +835,7 @@ function LoginCard({
 function Overview({
   snapshot,
   token,
+  user,
   accountRole,
   onChanged,
   onQuickAction,
@@ -840,6 +843,7 @@ function Overview({
 }: {
   snapshot: SiteSnapshot;
   token: string;
+  user: Session["user"];
   accountRole: UserRole;
   onChanged: (item: ReviewQueueItem, action: "publish" | "delete") => void;
   onQuickAction: (action: QuickAction) => void;
@@ -929,9 +933,16 @@ function Overview({
         </div>
       </div>
       {accountRole === "admin" ? (
-        <ReviewQueuePanel token={token} onChanged={onChanged} />
+        <ReviewQueuePanel
+          token={token}
+          user={user}
+          people={snapshot.people}
+          news={snapshot.news}
+          publications={snapshot.publications}
+          onChanged={onChanged}
+        />
       ) : (
-        <MyReviewQueuePanel token={token} />
+        <MyReviewQueuePanel token={token} user={user} people={snapshot.people} />
       )}
     </>
   );
@@ -2055,11 +2066,229 @@ function PublicationEditor({
   );
 }
 
-function MyReviewQueuePanel({ token }: { token: string }) {
+type ReviewEditorItem = NewsItem | Publication | Person;
+
+function payloadString(
+  payload: Record<string, unknown>,
+  key: string,
+  fallback = "",
+) {
+  const value = payload[key];
+  return typeof value === "string" ? value : fallback;
+}
+
+function payloadNullableString(
+  payload: Record<string, unknown>,
+  key: string,
+) {
+  const value = payload[key];
+  return typeof value === "string" ? value : null;
+}
+
+function payloadNumber(
+  payload: Record<string, unknown>,
+  key: string,
+  fallback: number,
+) {
+  const value = payload[key];
+  return typeof value === "number" ? value : fallback;
+}
+
+function payloadStringArray(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
+function buildSubmissionDraft(
+  detail: SubmissionDetail,
+  user: Session["user"],
+): ReviewEditorItem {
+  const payload = detail.payload;
+  const id = detail.content_id ?? 0;
+  if (detail.content_type === "news") {
+    return {
+      id,
+      date: payloadString(
+        payload,
+        "date",
+        new Date().toISOString().slice(0, 10),
+      ),
+      title: payloadString(payload, "title", detail.title),
+      body: payloadString(payload, "body", detail.summary),
+      href: payloadNullableString(payload, "href"),
+      tag: payloadNullableString(payload, "tag"),
+      is_published: false,
+      created_by_id: detail.submitted_by_id,
+    };
+  }
+  if (detail.content_type === "publication") {
+    return {
+      id,
+      title: payloadString(payload, "title", detail.title),
+      authors: payloadString(payload, "authors", detail.summary),
+      venue: payloadString(payload, "venue"),
+      venue_short: payloadNullableString(payload, "venue_short"),
+      year: payloadNumber(payload, "year", new Date().getFullYear()),
+      type: payloadString(payload, "type", "Preprint"),
+      status: "Pending review",
+      abstract: payloadNullableString(payload, "abstract"),
+      paper_url: payloadNullableString(payload, "paper_url"),
+      pdf_url: payloadNullableString(payload, "pdf_url"),
+      code_url: payloadNullableString(payload, "code_url"),
+      video_url: payloadNullableString(payload, "video_url"),
+      thumbnail_url: payloadNullableString(payload, "thumbnail_url"),
+      featured: false,
+      is_published: false,
+      created_by_id: detail.submitted_by_id,
+    };
+  }
+  return {
+    id,
+    name: payloadString(payload, "name", detail.title),
+    role: payloadString(payload, "role", "Lab member"),
+    group: payloadString(payload, "group", "Students"),
+    education_level: payloadNullableString(payload, "education_level"),
+    enrollment_year:
+      typeof payload.enrollment_year === "number"
+        ? payload.enrollment_year
+        : null,
+    destination: payloadNullableString(payload, "destination"),
+    bio: payloadNullableString(payload, "bio"),
+    research_interests: payloadStringArray(payload, "research_interests"),
+    email: payloadNullableString(payload, "email") ?? user.email,
+    website_url: payloadNullableString(payload, "website_url"),
+    avatar_url: payloadNullableString(payload, "avatar_url"),
+    is_visible: false,
+    created_by_id: detail.submitted_by_id,
+    account_id: detail.submitted_by_id,
+    account_email: user.role === "contributor" ? user.email : null,
+    account_role: "contributor",
+  };
+}
+
+function ReviewSubmissionEditorDialog({
+  token,
+  user,
+  people,
+  contentType,
+  submissionId,
+  fallbackItem,
+  onClose,
+  onSaved,
+}: {
+  token: string;
+  user: Session["user"];
+  people: Person[];
+  contentType: ReviewQueueItem["content_type"];
+  submissionId?: number | null;
+  fallbackItem?: ReviewEditorItem | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [detail, setDetail] = useState<SubmissionDetail | null>(null);
+  const [loading, setLoading] = useState(Boolean(submissionId));
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!submissionId) return;
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const response = await fetch(
+          `${apiBase}/api/admin/submissions/${submissionId}`,
+          {
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) throw new Error("Could not load this submission.");
+        setDetail((await response.json()) as SubmissionDetail);
+      } catch (loadError) {
+        if (!controller.signal.aborted) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Could not load this submission.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [submissionId, token]);
+
+  const editorItem = detail
+    ? buildSubmissionDraft(detail, user)
+    : fallbackItem ?? null;
+  const labels = {
+    news: "news",
+    publication: "publication",
+    person: "profile",
+  } as const;
+
+  return (
+    <QuickActionDialog title={`Edit ${labels[contentType]}`} onClose={onClose}>
+      {loading ? (
+        <p className="text-[var(--slate)]">Loading submission…</p>
+      ) : error ? (
+        <p className="rounded-[7px] bg-[#fff0f0] px-3 py-2.5 text-[0.82rem] text-[var(--accent-deep)]">
+          {error}
+        </p>
+      ) : !editorItem ? (
+        <p className="text-[var(--slate)]">This submission is no longer available.</p>
+      ) : contentType === "news" ? (
+        <NewsEditor
+          item={editorItem as NewsItem}
+          token={token}
+          accountRole={user.role}
+          showHeader={false}
+          onCancel={onClose}
+          onSaved={() => onSaved()}
+        />
+      ) : contentType === "publication" ? (
+        <PublicationEditor
+          item={editorItem as Publication}
+          token={token}
+          accountRole={user.role}
+          showHeader={false}
+          onCancel={onClose}
+          onSaved={() => onSaved()}
+        />
+      ) : (
+        <ProfileEditor
+          profile={editorItem as Person}
+          people={people}
+          token={token}
+          user={user}
+          isEditingAnotherProfile={user.role === "admin"}
+          showHeader={false}
+          onChanged={() => onSaved()}
+          onReturnToPeople={onClose}
+        />
+      )}
+    </QuickActionDialog>
+  );
+}
+
+function MyReviewQueuePanel({
+  token,
+  user,
+  people,
+}: {
+  token: string;
+  user: Session["user"];
+  people: Person[];
+}) {
   const [items, setItems] = useState<SubmissionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
+  const [editingItem, setEditingItem] = useState<SubmissionItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2081,14 +2310,6 @@ function MyReviewQueuePanel({ token }: { token: string }) {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
-
-  function editHref(item: SubmissionItem) {
-    if (item.content_type === "news") return `/studio/news?edit=${item.content_id}`;
-    if (item.content_type === "publication") {
-      return `/studio/publications?edit=${item.content_id}`;
-    }
-    return "/studio/profile";
-  }
 
   async function updateStatus(item: SubmissionItem, action: "withdraw" | "clear") {
     setWorkingId(item.id);
@@ -2136,7 +2357,19 @@ function MyReviewQueuePanel({ token }: { token: string }) {
   } as const;
 
   return (
-    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+    <>
+      {editingItem ? (
+        <ReviewSubmissionEditorDialog
+          token={token}
+          user={user}
+          people={people}
+          contentType={editingItem.content_type}
+          submissionId={editingItem.id}
+          onClose={() => setEditingItem(null)}
+          onSaved={() => void load()}
+        />
+      ) : null}
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
       <div className="mb-[14px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem]">
         <div>
           <h2>My review queue</h2>
@@ -2194,12 +2427,13 @@ function MyReviewQueuePanel({ token }: { token: string }) {
             <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
               {item.status === "pending" ? (
                 <>
-                  <Link
+                  <button
                     className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-                    href={editHref(item)}
+                    type="button"
+                    onClick={() => setEditingItem(item)}
                   >
                     <Pencil size={14} /> Edit
-                  </Link>
+                  </button>
                   <button
                     className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--accent-deep)]"
                     type="button"
@@ -2223,21 +2457,31 @@ function MyReviewQueuePanel({ token }: { token: string }) {
           </div>
         ))}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
 function ReviewQueuePanel({
   token,
+  user,
+  people,
+  news,
+  publications,
   onChanged,
 }: {
   token: string;
+  user: Session["user"];
+  people: Person[];
+  news: NewsItem[];
+  publications: Publication[];
   onChanged: (item: ReviewQueueItem, action: "publish" | "delete") => void;
 }) {
   const [items, setItems] = useState<ReviewQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingKey, setWorkingKey] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [editingItem, setEditingItem] = useState<ReviewQueueItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2261,13 +2505,6 @@ function ReviewQueuePanel({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
-
-  function editHref(item: ReviewQueueItem) {
-    if (item.content_type === "news") return `/studio/news?edit=${item.id}`;
-    if (item.content_type === "publication")
-      return `/studio/publications?edit=${item.id}`;
-    return `/studio/profile?personId=${item.id}`;
-  }
 
   function deleteHref(item: ReviewQueueItem) {
     if (item.content_type === "news") return `/api/admin/news/${item.id}`;
@@ -2350,8 +2587,29 @@ function ReviewQueuePanel({
     publication: "Publication",
     person: "People profile",
   } as const;
+  const fallbackItem = editingItem
+    ? editingItem.content_type === "news"
+      ? news.find((entry) => entry.id === editingItem.id) ?? null
+      : editingItem.content_type === "publication"
+        ? publications.find((entry) => entry.id === editingItem.id) ?? null
+        : people.find((entry) => entry.id === editingItem.id) ?? null
+    : null;
+
   return (
-    <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
+    <>
+      {editingItem ? (
+        <ReviewSubmissionEditorDialog
+          token={token}
+          user={user}
+          people={people}
+          contentType={editingItem.content_type}
+          submissionId={editingItem.submission_id}
+          fallbackItem={fallbackItem}
+          onClose={() => setEditingItem(null)}
+          onSaved={() => void load()}
+        />
+      ) : null}
+      <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
       <div className="mb-[14px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem]">
         <div>
           <h2>Review queue</h2>
@@ -2417,18 +2675,20 @@ function ReviewQueuePanel({
                 >
                   <Trash2 size={14} /> Reject
                 </button>
-                <Link
+                <button
                   className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-                  href={editHref(item)}
+                  type="button"
+                  onClick={() => setEditingItem(item)}
                 >
                   <Pencil size={14} /> Edit
-                </Link>
+                </button>
               </div>
             </div>
           );
         })}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

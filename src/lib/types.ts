@@ -100,6 +100,10 @@ export interface SubmissionItem {
   reviewed_at?: string | null;
 }
 
+export interface SubmissionDetail extends SubmissionItem {
+  payload: Record<string, unknown>;
+}
+
 export interface FeedbackItem {
   id: number;
   author_name: string;

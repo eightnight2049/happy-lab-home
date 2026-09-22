@@ -13,7 +13,7 @@ from .db import SessionLocal, engine, get_db, settings
 from .models import Base, Feedback, LabSettings, NewsItem, Person, Publication, ResearchArea, Submission, User
 from .schemas import (AccountRolePayload, AdminPersonOut, AdminPublicationOut, CreateUserRequest, FeedbackOut, FeedbackPayload, FeedbackStatusPayload, HomeOut, LoginRequest,
                       LoginResponse, NewsOut, NewsPayload, PersonOut, PersonPayload, PublicationOut, PublicationPayload,
-                      RegisterRequest, RegisterResponse, ResearchOut, ReviewActionOut, ReviewQueueItem, SettingsOut, SettingsPayload, SubmissionOut,
+                      RegisterRequest, RegisterResponse, ResearchOut, ReviewActionOut, ReviewQueueItem, SettingsOut, SettingsPayload, SubmissionDetailOut, SubmissionOut,
                       UpdateUserRequest, UserOut, VisitOut)
 
 app = FastAPI(title="Motion Intelligence Lab API", version="0.1.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
@@ -898,6 +898,14 @@ def clear_submission(submission_id: int, db: Session = Depends(get_db), user: Us
     submission.cleared_at = now_utc()
     db.commit()
     return ReviewActionOut(id=submission.content_id or 0, content_type=submission.content_type, status="cleared")
+
+
+@app.get("/api/admin/submissions/{submission_id}", response_model=SubmissionDetailOut)
+def get_submission_detail(submission_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> SubmissionDetailOut:
+    submission = db.get(Submission, submission_id)
+    if not submission or (user.role != "admin" and submission.submitted_by_id != user.id):
+        raise HTTPException(status_code=404, detail="Submission not found")
+    return SubmissionDetailOut.model_validate(submission)
 
 
 @app.post("/api/admin/review-queue/{content_type}/{content_id}/publish", response_model=ReviewActionOut)
