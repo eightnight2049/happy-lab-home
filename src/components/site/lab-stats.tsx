@@ -23,10 +23,7 @@ function formatRunningTime(startedAt: string, now: Date) {
     return "Starting…";
   const elapsedSeconds = Math.floor((now.getTime() - start.getTime()) / 1000);
   const days = Math.floor(elapsedSeconds / 86_400);
-  const hours = Math.floor((elapsedSeconds % 86_400) / 3_600);
-  const minutes = Math.floor((elapsedSeconds % 3_600) / 60);
-  const seconds = elapsedSeconds % 60;
-  return `${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  return `${days}d`;
 }
 
 export function LabStats({
