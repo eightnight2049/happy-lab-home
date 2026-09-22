@@ -84,6 +84,7 @@ export interface ReviewQueueItem {
   created_at?: string | null;
   submission_id?: number | null;
   action?: string | null;
+  submitted_by_name?: string | null;
 }
 
 export interface SubmissionItem {

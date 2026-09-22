@@ -129,6 +129,7 @@ class ReviewQueueItem(BaseModel):
     created_at: datetime | None = None
     submission_id: int | None = None
     action: str | None = None
+    submitted_by_name: str | None = None
 
 
 class ReviewActionOut(BaseModel):

@@ -810,6 +810,7 @@ def list_review_queue(db: Session = Depends(get_db), _user: User = Depends(requi
     pending_submissions = db.scalars(select(Submission).where(Submission.status == "pending").order_by(Submission.created_at.desc(), Submission.id.desc())).all()
     pending_keys = {(row.content_type, row.content_id) for row in pending_submissions}
     for row in pending_submissions:
+        submitter = db.get(User, row.submitted_by_id)
         items.append(ReviewQueueItem(
             id=row.content_id or row.id,
             content_type=row.content_type,
@@ -820,16 +821,20 @@ def list_review_queue(db: Session = Depends(get_db), _user: User = Depends(requi
             created_at=row.created_at,
             submission_id=row.id,
             action=row.action,
+            submitted_by_name=submitter.full_name if submitter else None,
         ))
     for row in db.scalars(select(NewsItem).where(NewsItem.is_published.is_(False)).order_by(NewsItem.date.desc(), NewsItem.id.desc())).all():
         if ("news", row.id) not in pending_keys:
-            items.append(ReviewQueueItem(id=row.id, content_type="news", title=row.title, summary=row.body, status="Pending review", created_by_id=row.created_by_id, action="create"))
+            submitter = db.get(User, row.created_by_id) if row.created_by_id else None
+            items.append(ReviewQueueItem(id=row.id, content_type="news", title=row.title, summary=row.body, status="Pending review", created_by_id=row.created_by_id, action="create", submitted_by_name=submitter.full_name if submitter else None))
     for row in db.scalars(select(Publication).where((Publication.is_published.is_(False)) | (Publication.status == "Draft")).order_by(Publication.year.desc(), Publication.id.desc())).all():
         if ("publication", row.id) not in pending_keys:
-            items.append(ReviewQueueItem(id=row.id, content_type="publication", title=row.title, summary=f"{row.authors} · {row.venue} · {row.year}", status="Pending review", created_by_id=row.created_by_id, action="create"))
+            submitter = db.get(User, row.created_by_id) if row.created_by_id else None
+            items.append(ReviewQueueItem(id=row.id, content_type="publication", title=row.title, summary=f"{row.authors} · {row.venue} · {row.year}", status="Pending review", created_by_id=row.created_by_id, action="create", submitted_by_name=submitter.full_name if submitter else None))
     for row in db.scalars(select(Person).where(Person.is_visible.is_(False)).order_by(Person.id.desc())).all():
         if ("person", row.id) not in pending_keys:
-            items.append(ReviewQueueItem(id=row.id, content_type="person", title=row.name, summary=f"{row.role} · {row.group}", status="Pending review", created_by_id=row.created_by_id, action="create"))
+            submitter = db.get(User, row.created_by_id) if row.created_by_id else None
+            items.append(ReviewQueueItem(id=row.id, content_type="person", title=row.name, summary=f"{row.role} · {row.group}", status="Pending review", created_by_id=row.created_by_id, action="create", submitted_by_name=submitter.full_name if submitter else None))
     return items
 
 

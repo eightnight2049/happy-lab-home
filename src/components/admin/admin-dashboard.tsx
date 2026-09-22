@@ -2153,7 +2153,7 @@ function MyReviewQueuePanel({ token }: { token: string }) {
       <div className="grid gap-[9px]">
         {items.map((item) => (
           <div
-            className="flex items-start justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:flex-col"
+            className="flex items-start justify-between gap-4 rounded-[8px] border border-[var(--line-soft)] bg-[#fcfcfa] px-3.5 py-3 max-[720px]:flex-col"
             key={item.id}
           >
             <div className="min-w-0">
@@ -2180,13 +2180,13 @@ function MyReviewQueuePanel({ token }: { token: string }) {
               {item.status === "pending" ? (
                 <>
                   <Link
-                    className="inline-flex min-h-[38px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-2 text-[0.82rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                    className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
                     href={editHref(item)}
                   >
                     <Pencil size={14} /> Edit
                   </Link>
                   <button
-                    className="inline-flex min-h-[38px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-3 py-2 text-[0.82rem] font-semibold text-[var(--accent-deep)]"
+                    className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--accent-deep)]"
                     type="button"
                     disabled={workingId === item.id}
                     onClick={() => void updateStatus(item, "withdraw")}
@@ -2196,7 +2196,7 @@ function MyReviewQueuePanel({ token }: { token: string }) {
                 </>
               ) : (
                 <button
-                  className="inline-flex min-h-[38px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-2 text-[0.82rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                  className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
                   type="button"
                   disabled={workingId === item.id}
                   onClick={() => void updateStatus(item, "clear")}
@@ -2338,7 +2338,12 @@ function ReviewQueuePanel({
   return (
     <div className="mb-5 rounded-[10px] border border-[#e0e0dc] bg-white p-[22px]">
       <div className="mb-[14px] flex items-center justify-between gap-4 [&_h2]:m-0 [&_h2]:text-[1.15rem]">
-        <h2>Review queue</h2>
+        <div>
+          <h2>Review queue</h2>
+          <p className="m-0 mt-1 text-[0.84rem] text-[var(--slate)]">
+            Review contributor changes before they appear publicly.
+          </p>
+        </div>
         <span
           className={`inline-flex items-center rounded-full px-2 py-1 text-[0.7rem] font-bold ${items.length ? "bg-[#fff4dc] text-[#8a5a00]" : "bg-[#eef7ee] text-[#31733d]"}`}
         >
@@ -2364,7 +2369,7 @@ function ReviewQueuePanel({
           const key = itemKey(item);
           return (
             <div
-              className="flex items-start justify-between gap-4 border-t border-[var(--line-soft)] py-3 first:border-t-0 max-[720px]:flex-col"
+              className="flex items-start justify-between gap-4 rounded-[8px] border border-[var(--line-soft)] bg-[#fcfcfa] px-3.5 py-3 max-[720px]:flex-col"
               key={key}
             >
               <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
@@ -2374,12 +2379,13 @@ function ReviewQueuePanel({
                 <strong>{item.title}</strong>
                 <span>{item.summary}</span>
                 <span className="mt-1 block text-[0.7rem] text-[var(--slate-light)]">
+                  {item.submitted_by_name ? `By ${item.submitted_by_name} · ` : ""}
                   Submitted {formatTimestamp(item.created_at)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
                 <button
-                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-[14px] py-2 text-[0.87rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
+                  className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[var(--accent)] bg-[var(--accent)] px-3 py-1.5 text-[0.8rem] font-semibold text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]"
                   type="button"
                   disabled={workingKey === key}
                   onClick={() => void publish(item)}
@@ -2387,7 +2393,7 @@ function ReviewQueuePanel({
                   {workingKey === key ? "Working…" : "Approve"}
                 </button>
                 <button
-                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--accent-deep)]"
+                  className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[#f0c9c9] bg-white px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--accent-deep)]"
                   type="button"
                   disabled={workingKey === key}
                   onClick={() => void remove(item)}
@@ -2395,7 +2401,7 @@ function ReviewQueuePanel({
                   <Trash2 size={14} /> Reject
                 </button>
                 <Link
-                  className="inline-flex min-h-[42px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-[14px] py-2 text-[0.87rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+                  className="inline-flex min-h-[36px] items-center gap-2 rounded-[7px] border border-[var(--line)] bg-white px-3 py-1.5 text-[0.8rem] font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
                   href={editHref(item)}
                 >
                   <Pencil size={14} /> Edit
