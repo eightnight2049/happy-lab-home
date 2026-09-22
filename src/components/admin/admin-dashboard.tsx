@@ -3319,8 +3319,6 @@ function UsersPanel({
     null,
   );
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const adminCount = users.filter((user) => user.role === "admin").length;
-
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
     setUsersError("");
@@ -3432,7 +3430,7 @@ function UsersPanel({
               ? "Loading…"
               : usersError
                 ? "Unavailable"
-                : `${adminCount}/5 admins · ${users.length} accounts`}
+                : `${users.length} ${users.length === 1 ? "account" : "accounts"}`}
           </span>
         </div>
         {message ? (
@@ -3473,9 +3471,7 @@ function UsersPanel({
             >
               <div className="min-w-0 [&>strong]:block [&>strong]:overflow-hidden [&>strong]:text-[0.9rem] [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>span]:block [&>span]:mt-0.5 [&>span]:overflow-hidden [&>span]:text-[0.76rem] [&>span]:text-ellipsis [&>span]:whitespace-nowrap [&>span]:text-[var(--slate)]">
                 <strong>{user.full_name || user.email}</strong>
-                <span>
-                  {user.email} · {user.is_active ? "Active" : "Paused"}
-                </span>
+                <span>{user.email}</span>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start">
                 <select
