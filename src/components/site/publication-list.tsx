@@ -5,7 +5,6 @@ import {
   ChevronDown,
   Code2,
   FileText,
-  House,
   Play,
   Search,
 } from "lucide-react";
@@ -13,8 +12,12 @@ import { useMemo, useState } from "react";
 import type { Publication } from "@/lib/types";
 
 const filters = ["All", "Conference", "Journal", "Preprint"];
-const actionClass =
-  "inline-flex items-center gap-1 rounded-[4px] border border-[var(--ink)] bg-[var(--ink)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:bg-black";
+const paperActionClass =
+  "inline-flex items-center gap-1 rounded-[4px] border border-[var(--accent)] bg-[var(--accent)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:border-[var(--accent-deep)] hover:bg-[var(--accent-deep)]";
+const codeActionClass =
+  "inline-flex items-center gap-1 rounded-[4px] border border-[var(--slate)] bg-[var(--slate)] px-[11px] py-[5px] text-[0.86rem] font-medium text-white hover:border-[var(--ink-soft)] hover:bg-[var(--ink-soft)]";
+const otherActionClass =
+  "inline-flex items-center gap-1 rounded-[4px] border border-[var(--line)] bg-white px-[11px] py-[5px] text-[0.86rem] font-medium text-[var(--ink-soft)] hover:border-[var(--ink-soft)] hover:bg-[var(--bg-muted)] hover:text-[var(--ink)]";
 
 export function PublicationList({ items }: { items: Publication[] }) {
   const [query, setQuery] = useState("");
@@ -173,15 +176,15 @@ function PublicationRow({ item }: { item: Publication }) {
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {available(item.paper_url) ? (
             <a
-              className={actionClass}
+              className={paperActionClass}
               href={item.paper_url ?? undefined}
             >
-              <House size={13} /> Home
+              <FileText size={13} /> Paper
             </a>
           ) : null}
           {available(item.code_url) ? (
             <a
-              className={actionClass}
+              className={codeActionClass}
               href={item.code_url ?? undefined}
             >
               <Code2 size={13} /> Code
@@ -189,7 +192,7 @@ function PublicationRow({ item }: { item: Publication }) {
           ) : null}
           {available(item.video_url) ? (
             <a
-              className={actionClass}
+              className={otherActionClass}
               href={item.video_url ?? undefined}
             >
               <Play size={13} /> Video
