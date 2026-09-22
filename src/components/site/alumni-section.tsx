@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { displayEducationLevel, displayPersonName } from "@/lib/person";
+import {
+  displayEducationLevel,
+  displayPersonName,
+  personProfileHref,
+} from "@/lib/person";
 import type { Person } from "@/lib/types";
 
 const levels = ["PhD", "Master's", "Undergraduate"] as const;
@@ -21,7 +25,7 @@ function AlumniRows({ people }: { people: Person[] }) {
           >
             <Link
               className="font-semibold text-[var(--ink)] hover:text-[var(--accent-deep)] hover:underline hover:underline-offset-3 max-[700px]:col-span-2"
-              href={`/people/${person.id}`}
+              href={personProfileHref(person)}
             >
               {displayPersonName(person)}
             </Link>

@@ -98,6 +98,16 @@ export function personSummary(
   return [bioSentence, researchSentence].filter(Boolean).join(" ");
 }
 
-export function personProfileHref(person: Pick<Person, "id">) {
-  return `/people/${person.id}`;
+export function personProfileSlug(person: Pick<Person, "name">) {
+  return (
+    displayPersonName(person)
+      .toLocaleLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "") || "person"
+  );
+}
+
+export function personProfileHref(person: Pick<Person, "id" | "name">) {
+  return `/people/${encodeURIComponent(personProfileSlug(person))}`;
 }

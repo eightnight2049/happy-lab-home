@@ -11,11 +11,17 @@ import {
   displayPersonName,
   displayPersonRole,
   isStudentPerson,
+  personProfileHref,
+  personProfileSlug,
 } from "@/lib/person";
 
 async function getPerson(id: string) {
   const snapshot = await getSiteSnapshot();
-  const person = snapshot.people.find((entry) => String(entry.id) === id);
+  const routeValue = decodeURIComponent(id);
+  const person = snapshot.people.find(
+    (entry) =>
+      String(entry.id) === routeValue || personProfileSlug(entry) === routeValue,
+  );
   return { person, snapshot };
 }
 
@@ -95,7 +101,7 @@ export default async function PersonProfilePage({
                   {person.website_url ? (
                     <Link
                       className="inline-flex items-center gap-2 text-[var(--accent)] hover:text-[var(--accent-deep)]"
-                      href={`/people/${person.id}`}
+                      href={personProfileHref(person)}
                     >
                       <Globe size={16} strokeWidth={1.8} aria-hidden="true" />
                       Personal website
