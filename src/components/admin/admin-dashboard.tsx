@@ -676,28 +676,17 @@ function LoginCard({
   return (
     <div className="grid min-h-screen place-items-center bg-[#f7f7f5] p-6">
       <div className="w-[min(440px,100%)] rounded-[14px] border border-[#e0e0dc] bg-white p-8 shadow-[0_18px_60px_-30px_rgba(0,0,0,0.3)]">
-        <div className="flex items-center gap-2.5 p-0">
+        <div className="flex items-center gap-3 p-0">
           <span
-            className="h-[58px] w-[52px] shrink-0 basis-[52px] bg-[url('/Xiaodong-transparent.png')] bg-contain bg-center bg-no-repeat"
+            className="h-[82px] w-[72px] shrink-0 basis-[72px] bg-[url('/Xiaodong-transparent.png')] bg-contain bg-center bg-no-repeat"
             aria-hidden="true"
           />
-          <div>
-            <strong className="text-[0.95rem]">MI Lab Portal</strong>
-            <span className="block text-[0.68rem] text-[var(--slate)]">
-              Secure content workspace
-            </span>
-          </div>
+          <strong className="text-[1.35rem] tracking-[-0.03em]">
+            MI Lab Portal
+          </strong>
         </div>
-        <h1 className="mt-5 mb-2 text-[2rem]">
-          {mode === "login" ? "Welcome back." : "Join the lab workspace."}
-        </h1>
-        <p className="text-[var(--slate)]">
-          {mode === "login"
-            ? "Sign in to update the lab site, publish research, and manage the team."
-            : "Create a user account. An admin can grant admin access later."}
-        </p>
         <nav
-          className="mt-[22px] grid grid-cols-2 gap-1 rounded-[8px] bg-[var(--bg-muted)] p-1"
+          className="mt-6 grid grid-cols-2 gap-1 rounded-[8px] bg-[var(--bg-muted)] p-1"
           aria-label="Portal access"
         >
           <Link
@@ -768,9 +757,6 @@ function LoginCard({
             {error}
           </div>
         ) : null}
-        <div className="mt-4 rounded-[7px] bg-[#f7f7f5] px-[13px] py-[11px] text-[0.78rem] text-[var(--slate)]">
-          This workspace is intentionally separate from the public lab website.
-        </div>
       </div>
     </div>
   );
